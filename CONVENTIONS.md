@@ -25,6 +25,15 @@ This document outlines the coding conventions used in our project, particularly 
 - For listing functions, output should typically include resource IDs and names.
 - Include 'NO_NAME' for resources without a Name tag.
 
+### Header Lines
+- Resource listing functions should use `__bma_output_header` to display column headers
+- Headers should be tab-separated to match the data format
+- Headers appear as comment lines (starting with #) for easy filtering
+- Example:
+  ```bash
+  __bma_output_header "INSTANCE_ID	AMI_ID	TYPE	STATE	NAME	LAUNCH_TIME	AZ	VPC"
+  ```
+
 ### Error Handling
 - Check for required arguments using `[[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1`.
 
@@ -41,29 +50,35 @@ This document outlines the coding conventions used in our project, particularly 
 
 #### skim-stdin
 
-The `skim-stdin` function is a utility function that allows functions to accept input from both command-line arguments and piped input. It appends the first token from each line of STDIN to the argument list.
+The `skim-stdin` function is a utility function that allows functions to accept input from both command-line arguments and piped input. It appends the first token from each non-comment line of STDIN to the argument list.
 
 ```bash
 skim-stdin() {
 
-  # Append first token from each line of STDIN to argument list
+  # Append first token from each non-comment line of STDIN to argument list
   #
-  # Implementation of `pipe-skimming` pattern.
+  # Implementation of `pipe-skimming` pattern that skips comment lines.
   #
   #     $ stacks | skim-stdin foo bar
   #     foo bar huginn mastodon grafana
   #
   #     $ stacks
-  #     huginn    CREATE_COMPLETE  2020-01-11T06:18:46.905Z  NEVER_UPDATED  NOT_NESTED
-  #     mastodon  CREATE_COMPLETE  2020-01-11T06:19:31.958Z  NEVER_UPDATED  NOT_NESTED
-  #     grafana   CREATE_COMPLETE  2020-01-11T06:19:47.001Z  NEVER_UPDATED  NOT_NESTED
+  #     # STACK_NAME  STATUS           CREATION_TIME             LAST_UPDATED    NESTED
+  #     huginn       CREATE_COMPLETE  2020-01-11T06:18:46.905Z  NEVER_UPDATED  NOT_NESTED
+  #     mastodon     CREATE_COMPLETE  2020-01-11T06:19:31.958Z  NEVER_UPDATED  NOT_NESTED
+  #     grafana      CREATE_COMPLETE  2020-01-11T06:19:47.001Z  NEVER_UPDATED  NOT_NESTED
   #
   # Typical usage within Bash-my-AWS functions:
   #
   #     local asg_names=$(skim-stdin "$@") # Append to arg list
   #     local asg_names=$(skim-stdin)      # Only draw from STDIN
+  #
+  # Enhanced to skip lines beginning with # (comment lines)
 
-  local skimmed_stdin="$([[ -t 0 ]] || awk 'ORS=" " { print $1 }')"
+  local skimmed_stdin="$([[ -t 0 ]] || awk '
+    /^#/ { next }      # Skip comment lines
+    { print $1 }       # Extract first field
+  ' ORS=" ")"
 
   printf -- '%s %s' "$*" "$skimmed_stdin" |
     awk '{$1=$1;print}'  # trim leading/trailing spaces
@@ -107,23 +122,27 @@ skim-stdin() {
 ## Shared Functions
 
 ### skim-stdin
-The `skim-stdin` function is a crucial utility for handling input in our scripts. It allows functions to accept input from both command-line arguments and piped input, providing flexibility in how users interact with our tools.
+The `skim-stdin` function is a crucial utility for handling input in our scripts. It allows functions to accept input from both command-line arguments and piped input, providing flexibility in how users interact with our tools. It automatically skips comment lines (lines beginning with #), making it compatible with header-enabled output.
 
 ```bash
 skim-stdin() {
-  # Append first token from each line of STDIN to argument list
+  # Append first token from each non-comment line of STDIN to argument list
   #
-  # Implementation of `pipe-skimming` pattern.
+  # Implementation of `pipe-skimming` pattern that skips comment lines.
   #
   #     $ stacks | skim-stdin foo bar
   #     foo bar huginn mastodon grafana
   #
   #     $ stacks
-  #     huginn    CREATE_COMPLETE  2020-01-11T06:18:46.905Z  NEVER_UPDATED  NOT_NESTED
-  #     mastodon  CREATE_COMPLETE  2020-01-11T06:19:31.958Z  NEVER_UPDATED  NOT_NESTED
-  #     grafana   CREATE_COMPLETE  2020-01-11T06:19:47.001Z  NEVER_UPDATED  NOT_NESTED
+  #     # STACK_NAME  STATUS           CREATION_TIME             LAST_UPDATED    NESTED
+  #     huginn       CREATE_COMPLETE  2020-01-11T06:18:46.905Z  NEVER_UPDATED  NOT_NESTED
+  #     mastodon     CREATE_COMPLETE  2020-01-11T06:19:31.958Z  NEVER_UPDATED  NOT_NESTED
+  #     grafana      CREATE_COMPLETE  2020-01-11T06:19:47.001Z  NEVER_UPDATED  NOT_NESTED
 
-  local skimmed_stdin="$([[ -t 0 ]] || awk 'ORS=" " { print $1 }')"
+  local skimmed_stdin="$([[ -t 0 ]] || awk '
+    /^#/ { next }      # Skip comment lines
+    { print $1 }       # Extract first field
+  ' ORS=" ")"
 
   printf -- '%s %s' "$*" "$skimmed_stdin" |
     awk '{$1=$1;print}'  # trim leading/trailing spaces
@@ -150,6 +169,47 @@ columnise() {
 Usage:
 - Pipe the output of AWS CLI commands through `columnise` to format it into aligned columns.
 - Example: `aws ec2 describe-vpcs ... | columnise`
+
+### __bma_output_header
+The `__bma_output_header` function outputs column headers for resource listing functions based on the BMA_HEADERS environment variable:
+
+```bash
+__bma_output_header() {
+  # Output a header comment line based on BMA_HEADERS environment variable
+  #
+  # Controls when headers are displayed:
+  #   - auto (default): Headers in terminal, none in pipes
+  #   - always: Headers in all output
+  #   - never: No headers anywhere
+  #
+  # Usage:
+  #   __bma_output_header "INSTANCE_ID	AMI_ID	TYPE	STATE	NAME"
+  
+  local header="$1"
+  local headers_mode="${BMA_HEADERS:-auto}"
+  
+  case "$headers_mode" in
+    never)
+      # Don't output headers
+      ;;
+    always)
+      # Always output headers
+      printf "# %s\n" "$header"
+      ;;
+    auto|*)
+      # Output headers only when output is to a terminal
+      if [[ -t 1 ]]; then
+        printf "# %s\n" "$header"
+      fi
+      ;;
+  esac
+}
+```
+
+Usage:
+- Call at the beginning of resource listing functions before outputting data
+- Pass tab-separated column names matching the data format
+- Example: `__bma_output_header "VPC_ID	DEFAULT	NAME	CIDR	STACK	VERSION"`
 
 These shared functions enhance the consistency and usability of our scripts across the project.
 

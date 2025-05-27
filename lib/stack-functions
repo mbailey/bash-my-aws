@@ -42,6 +42,7 @@ stacks() {
   # Output is sorted by CreationTime
   #
   #     $ stacks
+  #     # STACK_NAME      STATUS           CREATION_TIME         LAST_UPDATED    NESTED
   #     nagios          CREATE_COMPLETE  2018-03-12T11:41:31Z  NEVER_UPDATED  NOT_NESTED
   #     postgres1       CREATE_COMPLETE  2019-04-14T15:22:44Z  NEVER_UPDATED  NOT_NESTED
   #     postgres2       CREATE_COMPLETE  2019-05-18T05:45:50Z  NEVER_UPDATED  NOT_NESTED
@@ -55,6 +56,9 @@ stacks() {
 
   local stack_names=$(skim-stdin) # Filter by stack-names from STDIN (optional)
   local filters=$(__bma_read_filters $@) # Filter output by arguments (optional)
+
+  # Output header comment
+  __bma_output_header "STACK_NAME	STATUS	CREATION_TIME	LAST_UPDATED	NESTED"
 
   aws cloudformation list-stacks                      \
     --stack-status                                    \
@@ -324,6 +328,9 @@ stack-delete() {
 # This breaks from convention for bash-my-aws functions
 # TODO Find a way to make it more consistent
 stack-exports() {
+  # Output header comment
+  __bma_output_header "EXPORT_NAME	EXPORT_VALUE"
+
   aws cloudformation list-exports     \
     --query 'Exports[].[Name, Value]' \
     --output text                     |
@@ -405,14 +412,18 @@ stack-resources() {
   #     USAGE: stack-resources stack [stack]
   #
   #     $ stacks | stack-resources
-  #     i-7d54924538baa7a1f  AWS::EC2::Instance  ec2
-  #     i-c54279c6055c3c794  AWS::EC2::Instance  nagios
-  #     i-a8b8dd6783e1a40cc  AWS::EC2::Instance  postgres1
-  #     i-5d74753e210bfe04d  AWS::EC2::Instance  postgres2
-  #     i-2aa95cc214a461398  AWS::EC2::Instance  prometheus-web
+  #     # PHYSICAL_RESOURCE_ID  RESOURCE_TYPE       RESOURCE_STATUS  STACK
+  #     i-7d54924538baa7a1f    AWS::EC2::Instance  CREATE_COMPLETE  ec2
+  #     i-c54279c6055c3c794    AWS::EC2::Instance  CREATE_COMPLETE  nagios
+  #     i-a8b8dd6783e1a40cc    AWS::EC2::Instance  CREATE_COMPLETE  postgres1
+  #     i-5d74753e210bfe04d    AWS::EC2::Instance  CREATE_COMPLETE  postgres2
+  #     i-2aa95cc214a461398    AWS::EC2::Instance  CREATE_COMPLETE  prometheus-web
 
   local stacks=$(skim-stdin "$@")
   [[ -z ${stacks} ]] && __bma_usage "stack [stack]" && return 1
+
+  # Output header comment
+  __bma_output_header "PHYSICAL_RESOURCE_ID	RESOURCE_TYPE	RESOURCE_STATUS	STACK"
 
   local stack
   for stack in $stacks; do
@@ -523,6 +534,9 @@ stack-status() {
 
   local stacks=$(skim-stdin "$@")
   [[ -z ${stacks} ]] && __bma_usage "stack [stack]" && return 1
+
+  # Output header comment
+  __bma_output_header "STACK_NAME	STACK_STATUS"
 
   local stack
   for stack in $stacks; do
@@ -762,6 +776,9 @@ stack-outputs() {
   local inputs=$(skim-stdin "$@")
   local stack=$(_bma_stack_name_arg ${inputs})
   [[ -z ${stack} ]] && __bma_usage "stack" && return 1
+
+  # Output header comment
+  __bma_output_header "OUTPUT_KEY	OUTPUT_VALUE	DESCRIPTION"
 
   aws cloudformation describe-stacks \
     --stack-name ${stack}            \

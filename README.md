@@ -175,6 +175,7 @@ Put the following in your shell's startup file:
 ```Shell
 export PATH="$PATH:${BMA_HOME:-$HOME/.bash-my-aws}/bin"
 export BMA_COLUMNISE_ONLY_WHEN_TERMINAL_PRESENT=true
+export BMA_HEADERS=auto  # auto|always|never - Control header output in terminal/pipes
 source ${BMA_HOME:-$HOME/.bash-my-aws}/aliases
 
 # For ZSH users, uncomment the following two lines:
@@ -201,6 +202,48 @@ to [@ninth-dev](https://github.com/ninth-dev) for this.
       for f in ${BMA_HOME:-$HOME/.bash-my-aws}/lib/*-functions; do source $f; done
     fi
 ```
+
+## Environment Variables
+
+### BMA_HEADERS
+
+Controls header output for resource listing functions.
+
+- `auto` (default): Show headers in terminal, hide in pipes
+- `always`: Always show headers
+- `never`: Never show headers
+
+```bash
+# Default behavior - headers shown in terminal only
+export BMA_HEADERS=auto
+
+# Force headers everywhere (useful for documentation/demos)
+export BMA_HEADERS=always
+
+# Suppress all headers (maintains legacy behavior)
+export BMA_HEADERS=never
+```
+
+When headers are enabled, resource listing commands will display column headers as comments:
+
+```shell
+$ instances
+# INSTANCE_ID          AMI_ID            TYPE     STATE    NAME                        LAUNCH_TIME               AZ               VPC
+i-e6f097f6ea4457757  ami-123456789012  t3.nano  running  example-ec2-ap-southeast-2  2019-12-07T08:12:00.000Z  ap-southeast-2a  None
+i-b983805b4b254f749  ami-123456789012  t3.nano  running  postfix-prod                2019-12-07T08:26:30.000Z  ap-southeast-2a  None
+```
+
+Headers are automatically skipped when piping between commands:
+
+```shell
+$ instances | instance-ip
+i-e6f097f6ea4457757  10.1.2.3    54.1.2.3
+i-b983805b4b254f749  10.1.2.4    54.1.2.4
+```
+
+### BMA_COLUMNISE_ONLY_WHEN_TERMINAL_PRESENT
+
+This variable controls whether output is columnized. Set to `true` to only columnize when outputting to a terminal.
 
 ## Usage
 

@@ -9,11 +9,15 @@ keypairs() {
   # List EC2 SSH Keypairs in current Region
   #
   #     $ keypairs
-  #     alice  8f:85:9a:1e:6c:76:29:34:37:45:de:7f:8d:f9:70:eb
-  #     bob    56:73:29:c2:ad:7b:6f:b6:f2:f3:b4:de:e4:2b:12:d4
+  #     # KEYPAIR_NAME  FINGERPRINT
+  #     alice          8f:85:9a:1e:6c:76:29:34:37:45:de:7f:8d:f9:70:eb
+  #     bob            56:73:29:c2:ad:7b:6f:b6:f2:f3:b4:de:e4:2b:12:d4
 
   local keypairs=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
+
+  # Output header comment
+  __bma_output_header "KEYPAIR_NAME	FINGERPRINT"
 
   aws ec2 describe-key-pairs                       \
     ${keypairs/#/'--key-names '}                   \

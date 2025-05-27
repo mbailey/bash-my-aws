@@ -97,9 +97,9 @@ This implementation uses a simple Bash function called `skim-stdin`:
 
     skim-stdin() {
 
-      # Append first token from each line of STDIN to argument list
+      # Append first token from each non-comment line of STDIN to argument list
       #
-      # Implementation of `pipe-skimming` pattern.
+      # Implementation of `pipe-skimming` pattern that skips comment lines.
       #
       # Typical usage within Bash-my-AWS:
       #
@@ -110,21 +110,30 @@ This implementation uses a simple Bash function called `skim-stdin`:
       #     foo bar huginn mastodon grafana
       #
       #     $ stacks
-      #     huginn    CREATE_COMPLETE  2020-01-11T06:18:46.905Z  NEVER_UPDATED  NOT_NESTED
-      #     mastodon  CREATE_COMPLETE  2020-01-11T06:19:31.958Z  NEVER_UPDATED  NOT_NESTED
-      #     grafana   CREATE_COMPLETE  2020-01-11T06:19:47.001Z  NEVER_UPDATED  NOT_NESTED
+      #     # STACK_NAME  STATUS           CREATION_TIME             LAST_UPDATED    NESTED
+      #     huginn       CREATE_COMPLETE  2020-01-11T06:18:46.905Z  NEVER_UPDATED  NOT_NESTED
+      #     mastodon     CREATE_COMPLETE  2020-01-11T06:19:31.958Z  NEVER_UPDATED  NOT_NESTED
+      #     grafana      CREATE_COMPLETE  2020-01-11T06:19:47.001Z  NEVER_UPDATED  NOT_NESTED
+      #
+      # Enhanced to skip lines beginning with # (comment lines)
 
-      (
-        printf -- "$*"                           # Print all args
-        printf " "                               # Print a space
-        [[ -t 0 ]] || awk 'ORS=" " { print $1 }' # Print first token of each line of STDIN
-      ) | awk '{$1=$1;print}'                    # Trim leading/trailing spaces
+      local skimmed_stdin="$([[ -t 0 ]] || awk '
+        /^#/ { next }      # Skip comment lines
+        { print $1 }       # Extract first field
+      ' ORS=" ")"
+
+      printf -- '%s %s' "$*" "$skimmed_stdin" |
+        awk '{$1=$1;print}'  # trim leading/trailing spaces
     }
 
 
 Almost every command in [Bash-my-AWS](https://bash-my-aws.org) makes use of
 `skim-stdin` to accept resource identifiers via arguments and/or piped input on
 STDIN.
+
+The enhanced version shown above automatically skips comment lines (lines beginning 
+with #), making it compatible with header-enabled output. This allows commands to 
+display helpful column headers without breaking the pipe-skimming functionality.
 
 AFAIK, this pattern has not previously been described.
 

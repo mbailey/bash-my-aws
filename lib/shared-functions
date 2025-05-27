@@ -7,24 +7,30 @@
 
 skim-stdin() {
 
-  # Append first token from each line of STDIN to argument list
+  # Append first token from each non-comment line of STDIN to argument list
   #
-  # Implementation of `pipe-skimming` pattern.
+  # Implementation of `pipe-skimming` pattern that skips comment lines.
   #
   #     $ stacks | skim-stdin foo bar
   #     foo bar huginn mastodon grafana
   #
   #     $ stacks
-  #     huginn    CREATE_COMPLETE  2020-01-11T06:18:46.905Z  NEVER_UPDATED  NOT_NESTED
-  #     mastodon  CREATE_COMPLETE  2020-01-11T06:19:31.958Z  NEVER_UPDATED  NOT_NESTED
-  #     grafana   CREATE_COMPLETE  2020-01-11T06:19:47.001Z  NEVER_UPDATED  NOT_NESTED
+  #     # STACK_NAME  STATUS           CREATION_TIME             LAST_UPDATED    NESTED
+  #     huginn       CREATE_COMPLETE  2020-01-11T06:18:46.905Z  NEVER_UPDATED  NOT_NESTED
+  #     mastodon     CREATE_COMPLETE  2020-01-11T06:19:31.958Z  NEVER_UPDATED  NOT_NESTED
+  #     grafana      CREATE_COMPLETE  2020-01-11T06:19:47.001Z  NEVER_UPDATED  NOT_NESTED
   #
   # Typical usage within Bash-my-AWS functions:
   #
   #     local asg_names=$(skim-stdin "$@") # Append to arg list
   #     local asg_names=$(skim-stdin)      # Only draw from STDIN
+  #
+  # Enhanced to skip lines beginning with # (comment lines)
 
-  local skimmed_stdin="$([[ -t 0 ]] || awk 'ORS=" " { print $1 }')"
+  local skimmed_stdin="$([[ -t 0 ]] || awk '
+    /^#/ { next }      # Skip comment lines
+    { print $1 }       # Extract first field
+  ' ORS=" ")"
 
   printf -- '%s %s' "$*" "$skimmed_stdin" |
     awk '{$1=$1;print}'  # trim leading/trailing spaces
@@ -63,6 +69,38 @@ __bma_error() {
 
 __bma_usage() {
   echo "USAGE: ${FUNCNAME[1]} $@" > /dev/stderr
+}
+
+
+__bma_output_header() {
+  # Output a header comment line based on BMA_HEADERS environment variable
+  #
+  # Controls when headers are displayed:
+  #   - auto (default): Headers in terminal, none in pipes
+  #   - always: Headers in all output
+  #   - never: No headers anywhere
+  #
+  # Usage:
+  #   __bma_output_header "INSTANCE_ID	AMI_ID	TYPE	STATE	NAME"
+  
+  local header="$1"
+  local headers_mode="${BMA_HEADERS:-auto}"
+  
+  case "$headers_mode" in
+    never)
+      # Don't output headers
+      ;;
+    always)
+      # Always output headers
+      printf "# %s\n" "$header"
+      ;;
+    auto|*)
+      # Output headers only when output is to a terminal
+      if [[ -t 1 ]]; then
+        printf "# %s\n" "$header"
+      fi
+      ;;
+  esac
 }
 
 
