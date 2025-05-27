@@ -177,6 +177,7 @@ location
 location-each
 location-unset
 locations
+log-group-delete
 log-groups
 management-groups
 pcxs

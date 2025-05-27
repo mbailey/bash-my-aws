@@ -898,9 +898,6 @@ List CloudFormation stack for asg(s)
 List scaling activities for Autoscaling Group(s)
 
 
-azure.azcli
-
-
 ## azure-commands
 
 
@@ -1228,6 +1225,9 @@ List routes of all endpoints for Front Door Profile(s)
 
 ### deployment-delete-danger
 
+
+
+azure.azcli
 
 
 ## backup-commands
@@ -1777,6 +1777,21 @@ List CloudWatch Log Groups
     /aws/lambda/stars2  1576495961429  0   11736
     /aws/lambda/stars   1576566745961  0  107460
     /aws/lambda/walk    1576567300172  0   11794
+
+
+### log-group-delete
+
+Delete CloudWatch Log Group
+
+    $ log-group-delete /aws/lambda/stars
+    You are about to delete the following log groups?
+    /aws/lambda/stars
+    Are you sure? [y/N] y
+    Deleting: /aws/lambda/stars
+    Deleted: /aws/lambda/stars
+    
+    You can also pipe the log group names to this command
+    $ log-groups | log-group-delete
 
 
 ## rds-commands
