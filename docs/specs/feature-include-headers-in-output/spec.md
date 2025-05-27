@@ -94,14 +94,16 @@ skim-stdin() {
 
 Environment variable `BMA_HEADERS` controls header behavior:
 
-- `auto` (default): Headers in terminal, none in pipes
+- `auto` (default): Headers in terminal, none in pipes 
 - `always`: Headers in all output
 - `never`: No headers anywhere
 
+**Note**: Default behavior enables headers for better new user experience. Final default setting will be decided before merging based on user feedback and testing.
+
 ```bash
-export BMA_HEADERS=auto    # Default behavior
-export BMA_HEADERS=always  # Force headers
-export BMA_HEADERS=never   # Suppress headers
+export BMA_HEADERS=auto    # Default: headers in terminal, none in pipes
+export BMA_HEADERS=always  # Force headers everywhere
+export BMA_HEADERS=never   # Suppress all headers
 ```
 
 ### Implementation Pattern
@@ -283,6 +285,22 @@ This foundation enables:
    instances --sort name
    ```
 
+## Implementation Approach
+
+### Incremental Rollout Strategy
+
+1. **Start Simple**: Begin with a straightforward `lib/*-functions` file to validate the approach
+2. **One File at a Time**: Complete each library file fully before moving to the next
+3. **Document Learnings**: Capture insights from the first implementation to guide subsequent work
+4. **Improve Guidance**: Create clear instructions for developers/agents working on other files
+
+### Testing Strategy
+
+- **Bats Tests**: Comprehensive test suite using the bats testing framework
+- **Backwards Compatibility**: Ensure all existing workflows continue working
+- **Performance Testing**: Verify no measurable performance degradation
+- **User Acceptance**: Validate improved user experience with headers
+
 ## Success Criteria
 
 1.  Zero existing scripts break
@@ -293,6 +311,9 @@ This foundation enables:
 6.  Implementation is simple and maintainable
 7.  Performance impact is negligible
 8.  Foundation for future enhancements
+
+9. Comprehensive bats test coverage
+10. Clear documentation for contributors
 
 ## Rejection Criteria
 

@@ -8,13 +8,15 @@ This plan outlines the phased implementation of comment-based headers for bash-m
 
 ### Phase-Based Rollout
 1. **Phase 1**: Core infrastructure (1-2 weeks)
-2. **Phase 2**: High-value functions (2-3 weeks)  
-3. **Phase 3**: Complete rollout (4-6 weeks)
+2. **Phase 2**: Pilot implementation with simple library file (1-2 weeks)  
+3. **Phase 3**: One file at a time rollout (3-5 weeks)
 4. **Phase 4**: Future enhancements (ongoing)
 
 ### Risk Mitigation
-- Extensive backwards compatibility testing
-- Incremental rollout with quick rollback capability
+- Comprehensive bats testing framework
+- Start with simplest library file to validate approach
+- One `lib/*-functions` file at a time
+- Document learnings from pilot implementation
 - User feedback collection at each phase
 - Performance monitoring throughout
 
@@ -155,166 +157,212 @@ export BMA_HEADERS=always  # Force headers everywhere
 export BMA_HEADERS=never   # Suppress all headers
 ```
 
-### 1.4 Comprehensive Testing Suite
+### 1.4 Comprehensive Bats Testing Suite
 
-**File**: `test/header-spec.sh`
+**File**: `test/headers.bats`
 
 ```bash
-#!/bin/bash
+#!/usr/bin/env bats
 
-source lib/shared-functions
+load test_helper
 
-# Test skim-stdin backwards compatibility
-test_skim_stdin_backwards_compatibility() {
-  local result=$(echo -e "i-12345\ni-67890" | skim-stdin)
-  [[ "$result" == "i-12345 i-67890" ]] || {
-    echo "FAIL: skim-stdin backwards compatibility"
-    return 1
-  }
+setup() {
+  source lib/shared-functions
 }
 
-# Test skim-stdin comment skipping
-test_skim_stdin_comment_skipping() {
-  local result=$(echo -e "# HEADER\ni-12345\ni-67890" | skim-stdin)
-  [[ "$result" == "i-12345 i-67890" ]] || {
-    echo "FAIL: skim-stdin comment skipping"
-    return 1
-  }
+@test "skim-stdin backwards compatibility" {
+  result=$(echo -e "i-12345\ni-67890" | skim-stdin)
+  [ "$result" = "i-12345 i-67890" ]
 }
 
-# Test header output in different modes
-test_header_output_modes() {
-  # Test auto mode with terminal detection
-  BMA_HEADERS=auto __bma_output_header "TEST" >/dev/null
-  local auto_exit_code=$?
-  
-  # Test always mode  
-  local always_output=$(BMA_HEADERS=always __bma_output_header "TEST")
-  [[ "$always_output" == "# TEST" ]] || {
-    echo "FAIL: header output always mode"
-    return 1
-  }
-  
-  # Test never mode
-  local never_output=$(BMA_HEADERS=never __bma_output_header "TEST")
-  [[ -z "$never_output" ]] || {
-    echo "FAIL: header output never mode"
-    return 1
-  }
+@test "skim-stdin skips comment lines" {
+  result=$(echo -e "# HEADER\ni-12345\ni-67890" | skim-stdin)
+  [ "$result" = "i-12345 i-67890" ]
 }
 
-# Run all tests
-test_skim_stdin_backwards_compatibility
-test_skim_stdin_comment_skipping  
-test_header_output_modes
+@test "skim-stdin handles mixed comments and data" {
+  result=$(echo -e "# Comment\ni-12345\n# Another comment\ni-67890" | skim-stdin)
+  [ "$result" = "i-12345 i-67890" ]
+}
 
-echo "Phase 1 tests completed"
+@test "skim-stdin handles empty input" {
+  result=$(echo "" | skim-stdin)
+  [ "$result" = "" ]
+}
+
+@test "__bma_output_header always mode" {
+  result=$(BMA_HEADERS=always __bma_output_header "TEST")
+  [ "$result" = "# TEST" ]
+}
+
+@test "__bma_output_header never mode" {
+  result=$(BMA_HEADERS=never __bma_output_header "TEST")
+  [ "$result" = "" ]
+}
+
+@test "__bma_output_header handles empty input" {
+  run __bma_output_header ""
+  [ "$status" -eq 1 ]
+}
 ```
 
-## Phase 2: High-Value Functions (Weeks 3-4)
+## Phase 2: Pilot Implementation (Weeks 3-4)
 
-### 2.1 Priority Function Updates
+### 2.1 Target Library Selection
 
-Update the most commonly used functions first:
+**Objective**: Choose the simplest `lib/*-functions` file to validate the implementation approach.
 
-**File**: `lib/instance-functions`
+**Candidates** (in order of simplicity):
+1. `lib/keypair-functions` - Simple key-value output
+2. `lib/region-functions` - Minimal AWS calls  
+3. `lib/sts-functions` - Basic account information
+4. `lib/kms-functions` - Straightforward resource listing
+
+**Recommended Start**: `lib/keypair-functions`
+- Simple functions like `keypairs()`
+- Clear, predictable output format
+- Limited complexity for validation
+
+### 2.2 Pilot Implementation Example
+
+**File**: `lib/keypair-functions`
+
 ```bash
-instances() {
-  local instances=$(skim-stdin)
+keypairs() {
+  # List EC2 SSH KeyPairs
+  #
+  # USAGE: keypairs
+  
+  local keypair_names=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
   
-  # Output header comment
-  __bma_output_header "INSTANCE_ID	AMI_ID	TYPE	STATE	NAME	LAUNCH_TIME	AZ	VPC"
+  # Output header comment  
+  __bma_output_header "KEYPAIR_NAME	FINGERPRINT"
   
   # Existing implementation unchanged
-  aws ec2 describe-instances \
-    ${instances/#/'--instance-ids '} \
+  aws ec2 describe-key-pairs \
+    ${keypair_names/#/'--key-names '} \
     --output text \
-    --query "..." |
+    --query "KeyPairs[].[KeyName,KeyFingerprint]" |
   grep -E -- "$filters" |
-  LC_ALL=C sort -t$'\t' -k 6 |
   columnise
 }
 ```
 
-**Functions to Update**:
-1. `instances()` - Most used function
-2. `stacks()` - Core CloudFormation function  
-3. `buckets()` - Common S3 function
-4. `vpcs()` - Basic networking function
-5. `asgs()` - Auto Scaling function
+### 2.3 Pilot Testing Suite
 
-### 2.2 Header Definitions
+**File**: `test/keypair-headers.bats`
 
 ```bash
-# instances
-INSTANCE_ID	AMI_ID	TYPE	STATE	NAME	LAUNCH_TIME	AZ	VPC
+#!/usr/bin/env bats
 
-# stacks  
-STACK_NAME	STATUS	CREATION_TIME	LAST_UPDATED	NESTED
+load test_helper
 
-# buckets
-BUCKET_NAME	CREATION_DATE
-
-# vpcs
-VPC_ID	DEFAULT	NAME	CIDR	STACK	VERSION
-
-# asgs
-ASG_NAME	NAME_TAG	CREATED_TIME	AVAILABILITY_ZONES
-```
-
-### 2.3 Integration Testing
-
-**File**: `test/integration-spec.sh`
-
-```bash
-#!/bin/bash
-
-# Test end-to-end workflows with headers
-test_instances_workflow() {
-  # Test basic listing with headers
-  local output=$(BMA_HEADERS=always instances 2>/dev/null | head -1)
-  [[ "$output" =~ ^#.*INSTANCE_ID ]] || {
-    echo "FAIL: instances header missing"
-    return 1
-  }
-  
-  # Test piping still works (headers ignored)
-  local first_instance=$(instances | head -1 | awk '{print $1}')
-  [[ "$first_instance" =~ ^i- ]] || {
-    echo "FAIL: instances piping broken"
-    return 1
-  }
+setup() {
+  source lib/shared-functions
+  source lib/keypair-functions
 }
 
-test_instances_workflow
-echo "Phase 2 integration tests completed"
+@test "keypairs shows header in terminal" {
+  # Mock terminal output
+  BMA_HEADERS=always run keypairs
+  [[ "${lines[0]}" =~ ^#.*KEYPAIR_NAME ]]
+}
+
+@test "keypairs piping still works" {
+  # Test that skim-stdin ignores headers
+  result=$(echo -e "# KEYPAIR_NAME\tFINGERPRINT\ntest-key\t12:34:56" | skim-stdin)
+  [ "$result" = "test-key" ]
+}
+
+@test "keypairs backwards compatibility" {
+  # Ensure existing workflows don't break
+  BMA_HEADERS=never run keypairs
+  [[ ! "${lines[0]}" =~ ^# ]]
+}
 ```
 
-## Phase 3: Complete Rollout (Weeks 5-8)
+### 2.4 Document Learnings
 
-### 3.1 Remaining Functions
+After successful pilot implementation, create detailed documentation:
 
-Update all remaining resource listing functions:
+**File**: `docs/implementing-headers-guide.md`
 
-**Instance Functions** (`lib/instance-functions`):
-- `instance-dns()`: `INSTANCE_ID	PRIVATE_DNS	PUBLIC_DNS`
-- `instance-ip()`: `INSTANCE_ID	PRIVATE_IP	PUBLIC_IP`
-- `instance-state()`: `INSTANCE_ID	STATE`
-- `instance-type()`: `INSTANCE_ID	TYPE`
+Content should include:
+- Step-by-step implementation process
+- Common gotchas and solutions  
+- Testing patterns that work
+- Code review checklist
+- Performance considerations
+- Backwards compatibility verification steps
 
-**VPC Functions** (`lib/vpc-functions`):
-- `subnets()`: `SUBNET_ID	VPC_ID	AZ	CIDR	NAME`
-- `vpc-subnets()`: `SUBNET_ID	VPC_ID	AZ	CIDR	NAME`
+This documentation will guide implementation of remaining library files.
 
-**S3 Functions** (`lib/s3-functions`):
-- `bucket-size()`: `BUCKET_NAME	SIZE_STANDARD	SIZE_IA	SIZE_GLACIER`
+## Phase 3: One File at a Time Rollout (Weeks 5-8)
 
-**Additional Functions**:
-- All functions ending with `s()` (plurals)
-- Functions that output tabular data
+### 3.1 Implementation Order
 
-### 3.2 Quality Assurance
+Following the pilot success with `lib/keypair-functions`, implement headers one library file at a time:
+
+**Priority Order**:
+1. `lib/region-functions` - Simple, minimal complexity
+2. `lib/sts-functions` - Basic account info  
+3. `lib/s3-functions` - High-value bucket operations
+4. `lib/vpc-functions` - Core networking functions
+5. `lib/instance-functions` - Most complex, highest impact
+6. `lib/stack-functions` - CloudFormation operations
+7. `lib/asg-functions` - Auto Scaling operations
+8. Remaining files as needed
+
+### 3.2 Per-File Implementation Process
+
+For each `lib/*-functions` file:
+
+1. **Analysis Phase**
+   - Identify all listing functions (functions outputting tabular data)
+   - Define appropriate headers for each function
+   - Review function complexity and edge cases
+
+2. **Implementation Phase**  
+   - Add `__bma_output_header` calls to listing functions
+   - Follow the pilot implementation pattern
+   - Maintain existing function logic unchanged
+
+3. **Testing Phase**
+   - Create `test/{library}-headers.bats` file
+   - Test backwards compatibility
+   - Test header output in different modes
+   - Validate skim-stdin behavior
+
+4. **Documentation Phase**
+   - Update function comments with header information
+   - Add to implementation guide based on learnings
+
+### 3.3 Key Function Headers
+
+**Core Resource Listing Functions**:
+```bash
+# lib/instance-functions
+instances: "INSTANCE_ID	AMI_ID	TYPE	STATE	NAME	LAUNCH_TIME	AZ	VPC"
+instance-dns: "INSTANCE_ID	PRIVATE_DNS	PUBLIC_DNS"
+instance-ip: "INSTANCE_ID	PRIVATE_IP	PUBLIC_IP"
+
+# lib/stack-functions  
+stacks: "STACK_NAME	STATUS	CREATION_TIME	LAST_UPDATED	NESTED"
+
+# lib/s3-functions
+buckets: "BUCKET_NAME	CREATION_DATE"
+bucket-size: "BUCKET_NAME	SIZE_STANDARD	SIZE_IA	SIZE_GLACIER"
+
+# lib/vpc-functions
+vpcs: "VPC_ID	DEFAULT	NAME	CIDR	STACK	VERSION"
+subnets: "SUBNET_ID	VPC_ID	AZ	CIDR	NAME"
+
+# lib/asg-functions
+asgs: "ASG_NAME	NAME_TAG	CREATED_TIME	AVAILABILITY_ZONES"
+```
+
+### 3.4 Quality Assurance
 
 **Automated Testing**:
 ```bash
@@ -438,10 +486,11 @@ The comment-based approach minimizes rollback complexity since headers are purel
 
 | Week | Phase | Deliverables |
 |------|-------|-------------|
-| 1-2  | Infrastructure | skim-stdin, header helper, tests |
-| 3-4  | High-value functions | instances, stacks, buckets, vpcs, asgs |
-| 5-6  | Remaining functions | All other listing functions |
-| 7-8  | Quality assurance | Testing, documentation, polish |
-| 9+   | Future enhancements | JSON output, schema discovery |
+| 1-2  | Infrastructure | skim-stdin, header helper, bats tests |
+| 3-4  | Pilot Implementation | lib/keypair-functions, learnings documentation |
+| 5-6  | One-file rollout 1 | lib/region-functions, lib/sts-functions |
+| 7-8  | One-file rollout 2 | lib/s3-functions, lib/vpc-functions |
+| 9-10 | High-impact files | lib/instance-functions, lib/stack-functions |
+| 11+  | Complete & enhance | Remaining files, JSON output, schema discovery |
 
-This plan delivers immediate value while maintaining the elegance and reliability that bash-my-aws users expect.
+This plan delivers immediate value while maintaining the elegance and reliability that bash-my-aws users expect. The one-file-at-a-time approach ensures thorough validation and allows for iterative improvement of the implementation process based on learnings from each library file.
