@@ -57,44 +57,43 @@ stacks() {
   local stack_names=$(skim-stdin) # Filter by stack-names from STDIN (optional)
   local filters=$(__bma_read_filters $@) # Filter output by arguments (optional)
 
-  # Output header comment
-  __bma_output_header "STACK_NAME	STATUS	CREATION_TIME	LAST_UPDATED	NESTED"
-
-  aws cloudformation list-stacks                      \
-    --stack-status                                    \
-      CREATE_COMPLETE                                 \
-      CREATE_FAILED                                   \
-      CREATE_IN_PROGRESS                              \
-      DELETE_FAILED                                   \
-      DELETE_IN_PROGRESS                              \
-      IMPORT_IN_PROGRESS                              \
-      IMPORT_COMPLETE                                 \
-      IMPORT_ROLLBACK_IN_PROGRESS                     \
-      IMPORT_ROLLBACK_FAILED                          \
-      IMPORT_ROLLBACK_COMPLETE                        \
-      REVIEW_IN_PROGRESS                              \
-      ROLLBACK_COMPLETE                               \
-      ROLLBACK_FAILED                                 \
-      ROLLBACK_IN_PROGRESS                            \
-      UPDATE_COMPLETE                                 \
-      UPDATE_COMPLETE_CLEANUP_IN_PROGRESS             \
-      UPDATE_FAILED                                   \
-      UPDATE_IN_PROGRESS                              \
-      UPDATE_ROLLBACK_COMPLETE                        \
-      UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS    \
-      UPDATE_ROLLBACK_FAILED                          \
-      UPDATE_ROLLBACK_IN_PROGRESS                     \
-    --query "StackSummaries[${stack_names:+?contains(['${stack_names// /"','"}'], StackName)}][
-               StackName ,
-               StackStatus,
-               CreationTime,
-               LastUpdatedTime || 'NEVER_UPDATED',
-               ( RootId && 'NESTED') || 'NOT_NESTED'
-             ]"                                       \
-    --output text       |
-  grep -E -- "$filters" |
-  LC_ALL=C sort -b -k 3 |
-    columnise
+  {
+    __bma_output_header "STACK_NAME	STATUS	CREATION_TIME	LAST_UPDATED	NESTED"
+    aws cloudformation list-stacks                      \
+      --stack-status                                    \
+        CREATE_COMPLETE                                 \
+        CREATE_FAILED                                   \
+        CREATE_IN_PROGRESS                              \
+        DELETE_FAILED                                   \
+        DELETE_IN_PROGRESS                              \
+        IMPORT_IN_PROGRESS                              \
+        IMPORT_COMPLETE                                 \
+        IMPORT_ROLLBACK_IN_PROGRESS                     \
+        IMPORT_ROLLBACK_FAILED                          \
+        IMPORT_ROLLBACK_COMPLETE                        \
+        REVIEW_IN_PROGRESS                              \
+        ROLLBACK_COMPLETE                               \
+        ROLLBACK_FAILED                                 \
+        ROLLBACK_IN_PROGRESS                            \
+        UPDATE_COMPLETE                                 \
+        UPDATE_COMPLETE_CLEANUP_IN_PROGRESS             \
+        UPDATE_FAILED                                   \
+        UPDATE_IN_PROGRESS                              \
+        UPDATE_ROLLBACK_COMPLETE                        \
+        UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS    \
+        UPDATE_ROLLBACK_FAILED                          \
+        UPDATE_ROLLBACK_IN_PROGRESS                     \
+      --query "StackSummaries[${stack_names:+?contains(['${stack_names// /"','"}'], StackName)}][
+                 StackName ,
+                 StackStatus,
+                 CreationTime,
+                 LastUpdatedTime || 'NEVER_UPDATED',
+                 ( RootId && 'NESTED') || 'NOT_NESTED'
+               ]"                                       \
+      --output text       |
+    grep -E -- "$filters" |
+    LC_ALL=C sort -b -k 3
+  } | columnise
 }
 
 stack-arn() {
@@ -328,13 +327,12 @@ stack-delete() {
 # This breaks from convention for bash-my-aws functions
 # TODO Find a way to make it more consistent
 stack-exports() {
-  # Output header comment
-  __bma_output_header "EXPORT_NAME	EXPORT_VALUE"
-
-  aws cloudformation list-exports     \
-    --query 'Exports[].[Name, Value]' \
-    --output text                     |
-    columnise
+  {
+    __bma_output_header "EXPORT_NAME	EXPORT_VALUE"
+    aws cloudformation list-exports     \
+      --query 'Exports[].[Name, Value]' \
+      --output text
+  } | columnise
 }
 
 stack-recreate() {
@@ -422,23 +420,22 @@ stack-resources() {
   local stacks=$(skim-stdin "$@")
   [[ -z ${stacks} ]] && __bma_usage "stack [stack]" && return 1
 
-  # Output header comment
-  __bma_output_header "PHYSICAL_RESOURCE_ID	RESOURCE_TYPE	RESOURCE_STATUS	STACK"
-
-  local stack
-  for stack in $stacks; do
-    stack=$(_bma_stack_name_arg "$stack")
-    aws cloudformation describe-stack-resources                       \
-      --stack-name $(_bma_stack_name_arg "$stack")                    \
-      --output "${BMA_OUTPUT_AWS:-text}" \
-      --query "StackResources[].{
-               PhysicalResourceId: PhysicalResourceId,
-               ResourceType: ResourceType,
-               ResourceStatus: ResourceStatus,
-               Stack: '${stack}'
-             }" |
-      columnise
-  done
+  {
+    __bma_output_header "PHYSICAL_RESOURCE_ID	RESOURCE_TYPE	RESOURCE_STATUS	STACK"
+    local stack
+    for stack in $stacks; do
+      stack=$(_bma_stack_name_arg "$stack")
+      aws cloudformation describe-stack-resources                       \
+        --stack-name $(_bma_stack_name_arg "$stack")                    \
+        --output "${BMA_OUTPUT_AWS:-text}" \
+        --query "StackResources[].{
+                 PhysicalResourceId: PhysicalResourceId,
+                 ResourceType: ResourceType,
+                 ResourceStatus: ResourceStatus,
+                 Stack: '${stack}'
+               }"
+    done
+  } | columnise
 }
 
 stack-asgs() {
@@ -535,16 +532,16 @@ stack-status() {
   local stacks=$(skim-stdin "$@")
   [[ -z ${stacks} ]] && __bma_usage "stack [stack]" && return 1
 
-  # Output header comment
-  __bma_output_header "STACK_NAME	STACK_STATUS"
-
-  local stack
-  for stack in $stacks; do
-    aws cloudformation describe-stacks                   \
-      --stack-name "${stack}"                            \
-      --query "Stacks[][ [ StackName, StackStatus ] ][]" \
-      --output text
-  done
+  {
+    __bma_output_header "STACK_NAME	STACK_STATUS"
+    local stack
+    for stack in $stacks; do
+      aws cloudformation describe-stacks                   \
+        --stack-name "${stack}"                            \
+        --query "Stacks[][ [ StackName, StackStatus ] ][]" \
+        --output text
+    done
+  } | columnise
 }
 
 stack-tag() {
@@ -777,19 +774,18 @@ stack-outputs() {
   local stack=$(_bma_stack_name_arg ${inputs})
   [[ -z ${stack} ]] && __bma_usage "stack" && return 1
 
-  # Output header comment
-  __bma_output_header "OUTPUT_KEY	OUTPUT_VALUE	DESCRIPTION"
-
-  aws cloudformation describe-stacks \
-    --stack-name ${stack}            \
-    --query "Stacks[].Outputs[].[
-               OutputKey,
-               OutputValue,
-               Description || ''
-             ]"                      \
-    --output text                    |
-  LC_ALL=C sort              |
-    columnise
+  {
+    __bma_output_header "OUTPUT_KEY	OUTPUT_VALUE	DESCRIPTION"
+    aws cloudformation describe-stacks \
+      --stack-name ${stack}            \
+      --query "Stacks[].Outputs[].[
+                 OutputKey,
+                 OutputValue,
+                 Description || ''
+               ]"                      \
+      --output text                    |
+    LC_ALL=C sort
+  } | columnise
 }
 
 stack-validate() {

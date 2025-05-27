@@ -16,15 +16,14 @@ keypairs() {
   local keypairs=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
 
-  # Output header comment
-  __bma_output_header "KEYPAIR_NAME	FINGERPRINT"
-
-  aws ec2 describe-key-pairs                       \
-    ${keypairs/#/'--key-names '}                   \
-    --query 'KeyPairs[].[KeyName, KeyFingerprint]' \
-    --output text       |
-  grep -E -- "$filters" |
-    columnise
+  {
+    __bma_output_header "KEYPAIR_NAME	FINGERPRINT"
+    aws ec2 describe-key-pairs                       \
+      ${keypairs/#/'--key-names '}                   \
+      --query 'KeyPairs[].[KeyName, KeyFingerprint]' \
+      --output text       |
+    grep -E -- "$filters"
+  } | columnise
 }
 
 keypair-create() {

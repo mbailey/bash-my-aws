@@ -34,7 +34,7 @@ __bma_output_header "INSTANCE_ID AMI_ID TYPE STATE NAME"
 
 ### 3. Add Header Output
 
-Add the header output call after local variable declarations but before the AWS command:
+Add the header output within a command group that includes both the header and data, so they're aligned by `columnise`:
 
 ```bash
 function_name() {
@@ -43,13 +43,16 @@ function_name() {
   local resource_ids=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
   
-  # Output header comment
-  __bma_output_header "COLUMN1	COLUMN2	COLUMN3"
-  
-  # AWS command and processing
-  aws service describe-resources ...
+  {
+    __bma_output_header "COLUMN1	COLUMN2	COLUMN3"
+    # AWS command and processing
+    aws service describe-resources ... |
+    grep -E -- "$filters"
+  } | columnise
 }
 ```
+
+**Important**: The header and data must be in the same pipeline for proper column alignment. Use a command group `{ }` to include both the header output and data generation.
 
 ### 4. Update Function Documentation
 
@@ -100,14 +103,14 @@ resources() {
   local resource_ids=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
   
-  __bma_output_header "RESOURCE_ID	NAME	STATUS"
-  
-  aws service describe-resources \
-    ${resource_ids/#/'--resource-ids '} \
-    --query 'Resources[].[ResourceId,Name,Status]' \
-    --output text |
-  grep -E -- "$filters" |
-  columnise
+  {
+    __bma_output_header "RESOURCE_ID	NAME	STATUS"
+    aws service describe-resources \
+      ${resource_ids/#/'--resource-ids '} \
+      --query 'Resources[].[ResourceId,Name,Status]' \
+      --output text |
+    grep -E -- "$filters"
+  } | columnise
 }
 ```
 
@@ -119,20 +122,20 @@ For functions with JMESPath queries:
 complex_resources() {
   local filters=$(__bma_read_filters $@)
   
-  __bma_output_header "ID	TYPE	NAME	CREATED"
-  
-  aws service describe-resources \
-    --query '
-      Resources[].[
-        ResourceId,
-        ResourceType,
-        Tags[?Key==`Name`].Value|[0] || `NO_NAME`,
-        CreationTime
-      ]' \
-    --output text |
-  grep -E -- "$filters" |
-  sort -k 4 |
-  columnise
+  {
+    __bma_output_header "ID	TYPE	NAME	CREATED"
+    aws service describe-resources \
+      --query '
+        Resources[].[
+          ResourceId,
+          ResourceType,
+          Tags[?Key==`Name`].Value|[0] || `NO_NAME`,
+          CreationTime
+        ]' \
+      --output text |
+    grep -E -- "$filters" |
+    sort -k 4
+  } | columnise
 }
 ```
 
@@ -144,16 +147,39 @@ For functions that might return different column sets:
 flexible_resources() {
   local resource_type="$1"
   
-  case "$resource_type" in
-    type1)
-      __bma_output_header "ID	NAME	STATUS"
-      # Query for type1
-      ;;
-    type2)
-      __bma_output_header "ID	REGION	SIZE"
-      # Query for type2
-      ;;
-  esac
+  {
+    case "$resource_type" in
+      type1)
+        __bma_output_header "ID	NAME	STATUS"
+        # Query for type1
+        ;;
+      type2)
+        __bma_output_header "ID	REGION	SIZE"
+        # Query for type2
+        ;;
+    esac
+  } | columnise
+}
+```
+
+### Functions with Loops
+
+For functions that iterate over multiple resources:
+
+```bash
+multi_resources() {
+  local resources=$(skim-stdin "$@")
+  
+  {
+    __bma_output_header "RESOURCE_ID	TYPE	STATUS	NAME"
+    local resource
+    for resource in $resources; do
+      aws service describe-resource \
+        --resource-id "$resource" \
+        --query '[ResourceId,Type,Status,Name]' \
+        --output text
+    done
+  } | columnise
 }
 ```
 
