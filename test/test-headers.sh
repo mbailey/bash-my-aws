@@ -72,10 +72,10 @@ BMA_HEADERS=never
 result=$(__bma_output_header "HEADER1	HEADER2" | cat)
 test_case "__bma_output_header never mode" "" "$result"
 
-# Test 9: __bma_output_header defaults to auto
+# Test 9: __bma_output_header defaults to always
 unset BMA_HEADERS
 result=$(__bma_output_header "HEADER1	HEADER2" | cat)
-test_case "__bma_output_header auto mode (piped)" "" "$result"
+test_case "__bma_output_header always mode (default)" "# HEADER1	HEADER2" "$result"
 
 # Test 10: Integration test - headers don't interfere with skim-stdin
 BMA_HEADERS=always

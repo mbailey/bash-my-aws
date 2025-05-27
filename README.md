@@ -175,7 +175,7 @@ Put the following in your shell's startup file:
 ```Shell
 export PATH="$PATH:${BMA_HOME:-$HOME/.bash-my-aws}/bin"
 export BMA_COLUMNISE_ONLY_WHEN_TERMINAL_PRESENT=true
-export BMA_HEADERS=auto  # auto|always|never - Control header output in terminal/pipes
+export BMA_HEADERS=always  # always|auto|never - Control header output (default: always)
 source ${BMA_HOME:-$HOME/.bash-my-aws}/aliases
 
 # For ZSH users, uncomment the following two lines:
@@ -209,16 +209,16 @@ to [@ninth-dev](https://github.com/ninth-dev) for this.
 
 Controls header output for resource listing functions.
 
-- `auto` (default): Show headers in terminal, hide in pipes
-- `always`: Always show headers
+- `always` (default): Always show headers
+- `auto`: Show headers in terminal, hide in pipes
 - `never`: Never show headers
 
 ```bash
-# Default behavior - headers shown in terminal only
-export BMA_HEADERS=auto
-
-# Force headers everywhere (useful for documentation/demos)
+# Default behavior - headers shown everywhere
 export BMA_HEADERS=always
+
+# Headers only in terminal, hidden in pipes
+export BMA_HEADERS=auto
 
 # Suppress all headers (maintains legacy behavior)
 export BMA_HEADERS=never

@@ -178,8 +178,8 @@ __bma_output_header() {
   # Output a header comment line based on BMA_HEADERS environment variable
   #
   # Controls when headers are displayed:
-  #   - auto (default): Headers in terminal, none in pipes
-  #   - always: Headers in all output
+  #   - always (default): Headers in all output
+  #   - auto: Headers in terminal, none in pipes
   #   - never: No headers anywhere
   #
   # Usage:
