@@ -241,12 +241,32 @@ Based on the pilot implementation, potential future improvements include:
 4. JSON output format
 5. CSV export with headers
 
+## Key Lessons Learned
+
+### 1. Command Group Pattern is Critical
+Always use command groups `{ }` to ensure headers and data are processed together by `columnise`. This was the most important lesson from our implementation.
+
+### 2. Default to Always
+We changed the default from `auto` to `always` because terminal detection can be unreliable in certain environments. This provides a better out-of-box experience.
+
+### 3. Simple Test Patterns Work Best
+Basic pattern matching (e.g., checking for "COLUMN_NAME") is more reliable than complex regex patterns in tests.
+
+### 4. Order of Implementation Matters
+Start with the simplest functions first (keypairs, regions) to validate the pattern before tackling complex ones.
+
+### 5. Common Pitfalls to Avoid
+- Don't put columnise inside the command group
+- Always use tabs between header columns, not spaces
+- Test with mock AWS commands for faster iteration
+- Remember that some functions have multiple columnise calls
+
 ## Summary
 
 Adding headers to bash-my-aws functions is straightforward:
-1. Add `__bma_output_header` call with tab-separated column names
-2. Update documentation examples
-3. Test thoroughly
+1. Add `__bma_output_header` call with tab-separated column names inside a command group
+2. Update documentation examples to show the header line
+3. Test thoroughly with simple pattern matching
 4. Maintain backwards compatibility
 
 The enhanced skim-stdin function ensures headers don't break existing pipelines, making this a safe, user-friendly enhancement.

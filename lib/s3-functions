@@ -7,22 +7,25 @@ buckets() {
   # List S3 Buckets
   #
   #     $ buckets
-  #     web-assets  2019-12-20  08:24:38.182045
-  #     backups     2019-12-20  08:24:44.351215
-  #     archive     2019-12-20  08:24:57.567652
+  #     # BUCKET_NAME  CREATION_DATE
+  #     web-assets    2019-12-20  08:24:38.182045
+  #     backups       2019-12-20  08:24:44.351215
+  #     archive       2019-12-20  08:24:57.567652
 
   local buckets=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
 
-  aws s3api list-buckets \
-    --output text \
-    --query "
-      Buckets[${buckets:+?contains(['${buckets// /"','"}'], Name)}].[
-        Name,
-        CreationDate
-      ]" |
-    grep -E -- "$filters" |
-    column -t
+  {
+    __bma_output_header "BUCKET_NAME	CREATION_DATE"
+    aws s3api list-buckets \
+      --output text \
+      --query "
+        Buckets[${buckets:+?contains(['${buckets// /"','"}'], Name)}].[
+          Name,
+          CreationDate
+        ]" |
+    grep -E -- "$filters"
+  } | column -t
 }
 
 bucket-acls() {
@@ -243,8 +246,16 @@ bucket-size() {
   local tmp_dir=$(mktemp -d)
 
   # Process each bucket
-  local bucket_name
-  for bucket_name in $bucket_names; do
+  {
+    # Output header
+    if [[ "$show_all" == "true" ]]; then
+      __bma_output_header "BUCKET_NAME	STORAGE_CLASSES..."
+    else
+      __bma_output_header "BUCKET_NAME	STANDARD	STANDARD_IA	GLACIER	DEEP_ARCHIVE"
+    fi
+    
+    local bucket_name
+    for bucket_name in $bucket_names; do
     # Get the start and end time once for all queries
     local start_time=$(date -u -d '2 days ago' '+%Y-%m-%dT%H:%M:%SZ')
     local end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
@@ -312,7 +323,8 @@ bucket-size() {
     fi
 
     echo "$output"
-  done | columnise
+  done
+} | columnise
 
   # Clean up temporary files
   rm -rf "$tmp_dir"

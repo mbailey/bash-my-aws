@@ -6,6 +6,8 @@ pcxs(){
 
   # List VPC Peering connections
 
+  __bma_output_header PeeringConnectionId	Status	Requester	Accepter	Name
+
   local filters=$(__bma_read_filters $@)
   aws ec2 describe-vpc-peering-connections                     \
     --query 'VpcPeeringConnections[].[
@@ -35,9 +37,12 @@ subnets(){
   # List subnets for all VPCs
   #
   #     $ subnets
-  #     subnet-34fd9cfa  vpc-018d9739  ap-southeast-2c  172.31.32.0/20  NO_NAME
-  #     subnet-8bb774fe  vpc-018d9739  ap-southeast-2a  172.31.0.0/20   NO_NAME
-  #     subnet-9eea2c07  vpc-018d9739  ap-southeast-2b  172.31.16.0/20  NO_NAME
+  #     SubnetId         VpcId         AvailabilityZone  CidrBlock       Name
+  #     subnet-34fd9cfa  vpc-018d9739  ap-southeast-2c   172.31.32.0/20  NO_NAME
+  #     subnet-8bb774fe  vpc-018d9739  ap-southeast-2a   172.31.0.0/20   NO_NAME
+  #     subnet-9eea2c07  vpc-018d9739  ap-southeast-2b   172.31.16.0/20  NO_NAME
+
+  __bma_output_header SubnetId	VpcId	AvailabilityZone	CidrBlock	Name
 
   local subnet_ids=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
@@ -62,7 +67,10 @@ vpcs() {
   # List VPCs
   #
   #     $ vpcs
+  #     VpcId         Type         Name     CidrBlock      Stack     Version
   #     vpc-018d9739  default-vpc  NO_NAME  172.31.0.0/16  NO_STACK  NO_VERSION
+
+  __bma_output_header VpcId	Type	Name	CidrBlock	Stack	Version
 
   local vpc_ids=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
@@ -127,6 +135,8 @@ vpc-lambda-functions(){
   #
   #     USAGE: vpc-lambda-functions vpc-id [vpc-id]
 
+  __bma_output_header VpcId	FunctionName
+
   local vpc_ids=$(skim-stdin "$@")
   [[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1
 
@@ -160,6 +170,8 @@ vpc-endpoints(){
   #
   #     USAGE: vpc-endpoints [filter]
 
+  __bma_output_header VpcEndpointId	VpcId	State	Type	ServiceName
+
   local vpc_endpoint_ids=$(skim-stdin)
   local filters=$(__bma_read_filters $@ $vpc_ids)
 
@@ -185,6 +197,8 @@ vpc-endpoint-services(){
   #
   #     USAGE: vpc-endpoint-services
 
+  __bma_output_header ServiceName	ServiceType
+
   local filters=$(__bma_read_filters $@)
 
   aws ec2 describe-vpc-endpoint-services     \
@@ -204,6 +218,8 @@ vpc-igw() {
   # List Internet Gateway of VPC(s)
   #
   #     USAGE: vpc-igw vpc-id [vpc-id]
+
+  __bma_output_header InternetGatewayId	VpcId
 
   local vpc_ids=$(skim-stdin "$@")
   [[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1
@@ -227,7 +243,10 @@ vpc-route-tables(){
   #     USAGE: vpc-route-tables vpc-id [vpc-id]
   #
   #     $ vpcs | vpc-route-tables
+  #     RouteTableId  VpcId         Name
   #     rtb-8e841c39  vpc-018d9739  NO_NAME
+
+  __bma_output_header RouteTableId	VpcId	Name
 
   local vpc_ids=$(skim-stdin "$@")
   [[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1
@@ -252,6 +271,8 @@ vpc-nat-gateways(){
   #
   #     USAGE: vpc-nat-gateways vpc-id [vpc-id]
 
+  __bma_output_header NatGatewayId	VpcId	PublicIp
+
   local vpc_ids=$(skim-stdin "$@")
   [[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1
 
@@ -275,9 +296,10 @@ vpc-subnets(){
   #     USAGE: vpc-subnets vpc-id [vpc-id]
   #
   #     $ vpcs | vpc-subnets
-  #     subnet-34fd9cfa  vpc-018d9739  ap-southeast-2c  172.31.32.0/20  NO_NAME
-  #     subnet-8bb774fe  vpc-018d9739  ap-southeast-2a  172.31.0.0/20   NO_NAME
-  #     subnet-9eea2c07  vpc-018d9739  ap-southeast-2b  172.31.16.0/20  NO_NAME
+  #     SubnetId         VpcId         AvailabilityZone  CidrBlock       Name
+  #     subnet-34fd9cfa  vpc-018d9739  ap-southeast-2c   172.31.32.0/20  NO_NAME
+  #     subnet-8bb774fe  vpc-018d9739  ap-southeast-2a   172.31.0.0/20   NO_NAME
+  #     subnet-9eea2c07  vpc-018d9739  ap-southeast-2b   172.31.16.0/20  NO_NAME
 
   local vpc_ids=$(skim-stdin "$@")
   [[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1
@@ -297,7 +319,10 @@ vpc-network-acls(){
   #     USAGE: vpc-network-acls vpc-id [vpc-id]
   #
   #     $ vpcs | vpc-network-acls
+  #     NetworkAclId  VpcId
   #     acl-ff4914d1  vpc-018d9739
+
+  __bma_output_header NetworkAclId	VpcId
 
   local vpc_ids=$(skim-stdin "$@")
   [[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1
@@ -315,6 +340,8 @@ vpc-rds(){
   # List RDS instances of VPC(s)
   #
   #     USAGE: vpc-rds vpc-id [vpc-id]
+
+  __bma_output_header DBInstanceIdentifier	VpcId	DBName
 
   local vpc_ids=$(skim-stdin "$@")
   [[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1
@@ -407,9 +434,12 @@ subnet-ips() {
   #
   # EXAMPLE:
   #     $ subnet-ips subnet-12345678
-  #     10.0.1.10  eni-1234567890abcdef  EC2 Instance  i-abcdef1234567890
-  #     10.0.1.20  eni-0987654321fedcba  RDS Instance  db-foobar
-  #     10.0.1.30  eni-1a2b3c4d5e6f7g8h  Unknown       unknown
+  #     PrivateIpAddress  NetworkInterfaceId    ResourceType   ResourceId
+  #     10.0.1.10         eni-1234567890abcdef  EC2 Instance   i-abcdef1234567890
+  #     10.0.1.20         eni-0987654321fedcba  RDS Instance   db-foobar
+  #     10.0.1.30         eni-1a2b3c4d5e6f7g8h  Unknown        unknown
+
+  __bma_output_header PrivateIpAddress	NetworkInterfaceId	ResourceType	ResourceId
 
   local subnet_ids=$(skim-stdin "$@")
   [[ -z "$subnet_ids" ]] && __bma_usage "subnet-id [subnet-id...]" && return 1
@@ -447,7 +477,10 @@ network-interfaces() {
   #
   # EXAMPLE:
   #     $ network-interfaces
-  #     10.0.1.10  203.0.113.10  eni-1234567890abcdef  subnet-a1b2c3d4  vpc-11223344  in-use  default,web-tier  ELB net/my-nlb/1234567890abcdef
+  #     PrivateIpAddress  PublicIp      NetworkInterfaceId    VpcId         SubnetId         Status  Description
+  #     10.0.1.10         203.0.113.10  eni-1234567890abcdef  vpc-11223344  subnet-a1b2c3d4  in-use  ELB net/my-nlb/1234567890abcdef
+
+  __bma_output_header PrivateIpAddress	PublicIp	NetworkInterfaceId	VpcId	SubnetId	Status	Description
 
   local filters=$(__bma_read_filters $@)
 

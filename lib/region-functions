@@ -46,6 +46,7 @@ regions() {
   # cannot update an environment variable when run as a subprocess.
   #
   #     $ regions
+  #     # REGION
   #     ap-northeast-1
   #     ap-northeast-2
   #     ap-south-1
@@ -54,10 +55,13 @@ regions() {
   #     ...
   #     us-west-2
 
-  aws ec2 describe-regions           \
-    --query "Regions[].[RegionName]" \
-    --output text                    |
-  LC_ALL=C sort
+  {
+    __bma_output_header "REGION"
+    aws ec2 describe-regions           \
+      --query "Regions[].[RegionName]" \
+      --output text                    |
+    LC_ALL=C sort
+  }
 }
 
 

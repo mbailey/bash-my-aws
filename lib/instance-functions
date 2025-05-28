@@ -9,16 +9,20 @@ instances() {
   # List EC2 Instances
   #
   #     $ instances
-  #     i-4e15ece1de1a3f869  ami-123456789012  t3.nano  running  nagios          2019-12-10T08:17:18.000Z  ap-southeast-2a  None
-  #     i-89cefa9403373d7a5  ami-123456789012  t3.nano  running  postgres1       2019-12-10T08:17:20.000Z  ap-southeast-2a  None
-  #     i-806d8f1592e2a2efd  ami-123456789012  t3.nano  running  postgres2       2019-12-10T08:17:22.000Z  ap-southeast-2a  None
-  #     i-61e86ac6be1e2c193  ami-123456789012  t3.nano  running  prometheus-web  2019-12-10T08:17:24.000Z  ap-southeast-2a  None
+  #     InstanceId           ImageId           InstanceType  State    Name            LaunchTime                AvailabilityZone  VpcId
+  #     i-4e15ece1de1a3f869  ami-123456789012  t3.nano       running  nagios          2019-12-10T08:17:18.000Z  ap-southeast-2a   None
+  #     i-89cefa9403373d7a5  ami-123456789012  t3.nano       running  postgres1       2019-12-10T08:17:20.000Z  ap-southeast-2a   None
+  #     i-806d8f1592e2a2efd  ami-123456789012  t3.nano       running  postgres2       2019-12-10T08:17:22.000Z  ap-southeast-2a   None
+  #     i-61e86ac6be1e2c193  ami-123456789012  t3.nano       running  prometheus-web  2019-12-10T08:17:24.000Z  ap-southeast-2a   None
   #
   # *Optionally provide a filter string for a `| grep` effect with tighter columisation:*
   #
   #     $ instances postgres
-  #     i-89cefa9403373d7a5  ami-123456789012  t3.nano  running  postgres1  2019-12-10T08:17:20.000Z  ap-southeast-2a  None
-  #     i-806d8f1592e2a2efd  ami-123456789012  t3.nano  running  postgres2  2019-12-10T08:17:22.000Z  ap-southeast-2a  None
+  #     InstanceId           ImageId           InstanceType  State    Name       LaunchTime                AvailabilityZone  VpcId
+  #     i-89cefa9403373d7a5  ami-123456789012  t3.nano       running  postgres1  2019-12-10T08:17:20.000Z  ap-southeast-2a   None
+  #     i-806d8f1592e2a2efd  ami-123456789012  t3.nano       running  postgres2  2019-12-10T08:17:22.000Z  ap-southeast-2a   None
+
+  __bma_output_header InstanceId ImageId InstanceType State Name LaunchTime AvailabilityZone VpcId
 
   local instances=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
@@ -51,6 +55,8 @@ instance-asg() {
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
 
+  __bma_output_header AutoscalingGroupName InstanceId
+
   aws ec2 describe-instances      \
     --instance-ids $instance_ids  \
     --output text                 \
@@ -72,11 +78,14 @@ instance-az() {
   #     USAGE: instance-az instance-id [instance-id]
   #
   #     $ instances postgres | instance-az
+  #     InstanceId           AvailabilityZone
   #     i-89cefa9403373d7a5  ap-southeast-2a
   #     i-806d8f1592e2a2efd  ap-southeast-2a
 
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
+
+  __bma_output_header InstanceId AvailabilityZone
 
   aws ec2 describe-instances      \
     --instance-ids $instance_ids  \
@@ -131,11 +140,14 @@ instance-dns() {
   #     USAGE: instance-dns instance-id [instance-id]
   #
   #     $ instances postgres | instance-dns
-  #     i-89cefa9403373d7a5  ip-10-155-35-61.ap-southeast-2.compute.internal   ec2-54-214-206-114.ap-southeast-2.compute.amazonaws.com
-  #     i-806d8f1592e2a2efd  ip-10-178-243-63.ap-southeast-2.compute.internal  ec2-54-214-244-90.ap-southeast-2.compute.amazonaws.com
+  #     InstanceId           PrivateDnsName                                     PublicDnsName
+  #     i-89cefa9403373d7a5  ip-10-155-35-61.ap-southeast-2.compute.internal    ec2-54-214-206-114.ap-southeast-2.compute.amazonaws.com
+  #     i-806d8f1592e2a2efd  ip-10-178-243-63.ap-southeast-2.compute.internal   ec2-54-214-244-90.ap-southeast-2.compute.amazonaws.com
 
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
+
+  __bma_output_header InstanceId PrivateDnsName PublicDnsName
 
   aws ec2 describe-instances         \
     --instance-ids $instance_ids     \
@@ -179,6 +191,8 @@ instance-iam-profile() {
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
 
+  __bma_output_header InstanceId IamInstanceProfileId
+
   aws ec2 describe-instances      \
     --instance-ids $instance_ids  \
     --output text                 \
@@ -199,11 +213,14 @@ instance-ip() {
   #     USAGE: instance-ip instance-id [instance-id]
   #
   #     $ instances postgres | instance-ip
-  #     i-89cefa9403373d7a5  10.155.35.61   54.214.206.114
-  #     i-806d8f1592e2a2efd  10.178.243.63  54.214.244.90
+  #     InstanceId           PrivateIpAddress  PublicIpAddress
+  #     i-89cefa9403373d7a5  10.155.35.61      54.214.206.114
+  #     i-806d8f1592e2a2efd  10.178.243.63     54.214.244.90
 
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
+
+  __bma_output_header InstanceId PrivateIpAddress PublicIpAddress
 
   aws ec2 describe-instances           \
     --instance-ids $instance_ids       \
@@ -220,8 +237,20 @@ instance-ip() {
 }
 
 instance-profile() {
+
+  # List instance profile(s) for EC2 Instance(s)
+  #
+  #     USAGE: instance-profile instance-id [instance-id]
+  #
+  #     $ instances postgres | instance-profile
+  #     ProfileName                          ProfileId                   InstanceId
+  #     my-app-instance-profile              AIPA12345678901234567       i-89cefa9403373d7a5
+  #     my-app-instance-profile              AIPA12345678901234567       i-806d8f1592e2a2efd
+
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
+
+  __bma_output_header ProfileName ProfileId InstanceId
 
   aws ec2 describe-instances \
     --instance-ids ${instance_ids} \
@@ -298,6 +327,8 @@ instance-ssh-details() {
   local instance_ids=$(skim-stdin "$@")
   [[ -z "${instance_ids}" ]] && __bma_usage "instance_id" && return 1
 
+  __bma_output_header InstanceId KeyName IpAddress Name DefaultUser
+
   aws ec2 describe-instances                                      \
     --instance-ids $instance_ids                                  \
     --output text                                                 \
@@ -367,11 +398,14 @@ instance-stack() {
   #     USAGE: instance-stack instance-id [instance-id]
   #
   #     $ instances postgres | instance-stack
+  #     StackName  InstanceId
   #     postgres1  i-89cefa9403373d7a5
   #     postgres2  i-806d8f1592e2a2efd
 
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
+
+  __bma_output_header StackName InstanceId
 
   aws ec2 describe-instances                                         \
     --instance-ids $instance_ids                                     \
@@ -422,11 +456,14 @@ instance-state() {
   #     USAGE: instance-state instance-id [instance-id]
   #
   #     $ instances postgres | instance-state
+  #     InstanceId           State
   #     i-89cefa9403373d7a5  running
   #     i-806d8f1592e2a2efd  running
 
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
+
+  __bma_output_header InstanceId State
 
   aws ec2 describe-instances        \
     --instance-ids $instance_ids    \
@@ -475,6 +512,8 @@ instance-subnet() {
 
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
+
+  __bma_output_header SubnetId InstanceId Name
 
   aws ec2 describe-instances                            \
     --instance-ids $instance_ids                        \
@@ -575,6 +614,7 @@ instance-tags() {
   #     USAGE: instance-tags instance-id [instance-id]
   #
   #     $ instances | instance-tags
+  #     InstanceId           Tags
   #     i-4e15ece1de1a3f869  Name=nagios Role=monitoring Team=platform
   #     i-89cefa9403373d7a5  Name=postgres1 Role=database Team=platform
   #     i-806d8f1592e2a2efd  Name=postgres2 Role=database Team=platform
@@ -583,6 +623,8 @@ instance-tags() {
 
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
+
+  __bma_output_header InstanceId Tags
 
   aws ec2 describe-instances                            \
     --instance-ids $instance_ids                        \
@@ -602,6 +644,7 @@ instance-tags-v2() {
   #     USAGE: instance-tags instance-id [instance-id]
   #
   #     $ instances | instance-tags-v2
+  #     InstanceId           Key          Value
   #     i-4e15ece1de1a3f869  Name         nagios
   #     i-4e15ece1de1a3f869  Role         monitoring
   #     i-4e15ece1de1a3f869  Team         platform
@@ -611,6 +654,8 @@ instance-tags-v2() {
 
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
+
+  __bma_output_header InstanceId Key Value
 
   aws ec2 describe-instances                            \
     --instance-ids $instance_ids                        \
@@ -630,6 +675,8 @@ instance-tag() {
   shift
   local instances=$(skim-stdin "$@")
   [[ -z $key ]] && __bma_usage "key instance [instance]" && return 1
+
+  __bma_output_header ResourceId Key Value
 
   aws ec2 describe-tags                          \
     --filters                                    \
@@ -799,6 +846,7 @@ instance-type() {
   #     USAGE: instance-type instance-id [instance-id]
   #
   #     $ instances | instance-type
+  #     InstanceId           InstanceType
   #     i-4e15ece1de1a3f869  t3.nano
   #     i-89cefa9403373d7a5  t3.nano
   #     i-806d8f1592e2a2efd  t3.nano
@@ -806,6 +854,8 @@ instance-type() {
 
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
+
+  __bma_output_header InstanceId InstanceType
 
   aws ec2 describe-instances                                            \
     $([[ -n $instance_ids ]] && echo --instance-ids ${instance_ids})  \
@@ -848,11 +898,14 @@ instance-volumes() {
   #     USAGE: instance-volumes instance-id [instance-id]
   #
   #     $ instances postgres | instance-volumes
+  #     InstanceId           VolumeIds
   #     i-89cefa9403373d7a5  vol-cf5ddae9
   #     i-806d8f1592e2a2efd  vol-38fd45c3
 
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
+
+  __bma_output_header InstanceId VolumeIds
 
   aws ec2 describe-instances                                            \
     $([[ -n $instance_ids ]] && echo --instance-ids ${instance_ids})  \
@@ -875,6 +928,8 @@ instance-vpc() {
 
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
+
+  __bma_output_header VpcId InstanceId
 
   aws ec2 describe-instances     \
     --instance-ids $instance_ids \
