@@ -58,7 +58,7 @@ stacks() {
   local filters=$(__bma_read_filters $@) # Filter output by arguments (optional)
 
   {
-    __bma_output_header "STACK_NAME	STATUS	CREATION_TIME	LAST_UPDATED	NESTED"
+    __bma_output_header STACK_NAME STATUS CREATION_TIME LAST_UPDATED NESTED
     aws cloudformation list-stacks                      \
       --stack-status                                    \
         CREATE_COMPLETE                                 \
@@ -328,7 +328,7 @@ stack-delete() {
 # TODO Find a way to make it more consistent
 stack-exports() {
   {
-    __bma_output_header "EXPORT_NAME	EXPORT_VALUE"
+    __bma_output_header EXPORT_NAME EXPORT_VALUE
     aws cloudformation list-exports     \
       --query 'Exports[].[Name, Value]' \
       --output text
@@ -421,7 +421,7 @@ stack-resources() {
   [[ -z ${stacks} ]] && __bma_usage "stack [stack]" && return 1
 
   {
-    __bma_output_header "PHYSICAL_RESOURCE_ID	RESOURCE_TYPE	RESOURCE_STATUS	STACK"
+    __bma_output_header PHYSICAL_RESOURCE_ID RESOURCE_TYPE RESOURCE_STATUS STACK
     local stack
     for stack in $stacks; do
       stack=$(_bma_stack_name_arg "$stack")
@@ -533,7 +533,7 @@ stack-status() {
   [[ -z ${stacks} ]] && __bma_usage "stack [stack]" && return 1
 
   {
-    __bma_output_header "STACK_NAME	STACK_STATUS"
+    __bma_output_header STACK_NAME STACK_STATUS
     local stack
     for stack in $stacks; do
       aws cloudformation describe-stacks                   \
@@ -775,7 +775,7 @@ stack-outputs() {
   [[ -z ${stack} ]] && __bma_usage "stack" && return 1
 
   {
-    __bma_output_header "OUTPUT_KEY	OUTPUT_VALUE	DESCRIPTION"
+    __bma_output_header OUTPUT_KEY OUTPUT_VALUE DESCRIPTION
     aws cloudformation describe-stacks \
       --stack-name ${stack}            \
       --query "Stacks[].Outputs[].[

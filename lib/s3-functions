@@ -16,7 +16,7 @@ buckets() {
   local filters=$(__bma_read_filters $@)
 
   {
-    __bma_output_header "BUCKET_NAME	CREATION_DATE"
+    __bma_output_header BUCKET_NAME CREATION_DATE
     aws s3api list-buckets \
       --output text \
       --query "
@@ -249,9 +249,9 @@ bucket-size() {
   {
     # Output header
     if [[ "$show_all" == "true" ]]; then
-      __bma_output_header "BUCKET_NAME	STORAGE_CLASSES..."
+      __bma_output_header BUCKET_NAME STORAGE_CLASSES...
     else
-      __bma_output_header "BUCKET_NAME	STANDARD	STANDARD_IA	GLACIER	DEEP_ARCHIVE"
+      __bma_output_header BUCKET_NAME STANDARD STANDARD_IA GLACIER DEEP_ARCHIVE
     fi
     
     local bucket_name

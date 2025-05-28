@@ -6,7 +6,7 @@ pcxs(){
 
   # List VPC Peering connections
 
-  __bma_output_header PeeringConnectionId	Status	Requester	Accepter	Name
+  __bma_output_header PeeringConnectionId Status Requester Accepter Name
 
   local filters=$(__bma_read_filters $@)
   aws ec2 describe-vpc-peering-connections                     \
@@ -42,7 +42,7 @@ subnets(){
   #     subnet-8bb774fe  vpc-018d9739  ap-southeast-2a   172.31.0.0/20   NO_NAME
   #     subnet-9eea2c07  vpc-018d9739  ap-southeast-2b   172.31.16.0/20  NO_NAME
 
-  __bma_output_header SubnetId	VpcId	AvailabilityZone	CidrBlock	Name
+  __bma_output_header SubnetId VpcId AvailabilityZone CidrBlock Name
 
   local subnet_ids=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
@@ -70,7 +70,7 @@ vpcs() {
   #     VpcId         Type         Name     CidrBlock      Stack     Version
   #     vpc-018d9739  default-vpc  NO_NAME  172.31.0.0/16  NO_STACK  NO_VERSION
 
-  __bma_output_header VpcId	Type	Name	CidrBlock	Stack	Version
+  __bma_output_header VpcId Type Name CidrBlock Stack Version
 
   local vpc_ids=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
@@ -135,7 +135,7 @@ vpc-lambda-functions(){
   #
   #     USAGE: vpc-lambda-functions vpc-id [vpc-id]
 
-  __bma_output_header VpcId	FunctionName
+  __bma_output_header VpcId FunctionName
 
   local vpc_ids=$(skim-stdin "$@")
   [[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1
@@ -170,7 +170,7 @@ vpc-endpoints(){
   #
   #     USAGE: vpc-endpoints [filter]
 
-  __bma_output_header VpcEndpointId	VpcId	State	Type	ServiceName
+  __bma_output_header VpcEndpointId VpcId State Type ServiceName
 
   local vpc_endpoint_ids=$(skim-stdin)
   local filters=$(__bma_read_filters $@ $vpc_ids)
@@ -197,7 +197,7 @@ vpc-endpoint-services(){
   #
   #     USAGE: vpc-endpoint-services
 
-  __bma_output_header ServiceName	ServiceType
+  __bma_output_header ServiceName ServiceType
 
   local filters=$(__bma_read_filters $@)
 
@@ -219,7 +219,7 @@ vpc-igw() {
   #
   #     USAGE: vpc-igw vpc-id [vpc-id]
 
-  __bma_output_header InternetGatewayId	VpcId
+  __bma_output_header InternetGatewayId VpcId
 
   local vpc_ids=$(skim-stdin "$@")
   [[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1
@@ -246,7 +246,7 @@ vpc-route-tables(){
   #     RouteTableId  VpcId         Name
   #     rtb-8e841c39  vpc-018d9739  NO_NAME
 
-  __bma_output_header RouteTableId	VpcId	Name
+  __bma_output_header RouteTableId VpcId Name
 
   local vpc_ids=$(skim-stdin "$@")
   [[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1
@@ -271,7 +271,7 @@ vpc-nat-gateways(){
   #
   #     USAGE: vpc-nat-gateways vpc-id [vpc-id]
 
-  __bma_output_header NatGatewayId	VpcId	PublicIp
+  __bma_output_header NatGatewayId VpcId PublicIp
 
   local vpc_ids=$(skim-stdin "$@")
   [[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1
@@ -322,7 +322,7 @@ vpc-network-acls(){
   #     NetworkAclId  VpcId
   #     acl-ff4914d1  vpc-018d9739
 
-  __bma_output_header NetworkAclId	VpcId
+  __bma_output_header NetworkAclId VpcId
 
   local vpc_ids=$(skim-stdin "$@")
   [[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1
@@ -341,7 +341,7 @@ vpc-rds(){
   #
   #     USAGE: vpc-rds vpc-id [vpc-id]
 
-  __bma_output_header DBInstanceIdentifier	VpcId	DBName
+  __bma_output_header DBInstanceIdentifier VpcId DBName
 
   local vpc_ids=$(skim-stdin "$@")
   [[ -z "$vpc_ids" ]] && __bma_usage "vpc-id [vpc-id]" && return 1
@@ -439,7 +439,7 @@ subnet-ips() {
   #     10.0.1.20         eni-0987654321fedcba  RDS Instance   db-foobar
   #     10.0.1.30         eni-1a2b3c4d5e6f7g8h  Unknown        unknown
 
-  __bma_output_header PrivateIpAddress	NetworkInterfaceId	ResourceType	ResourceId
+  __bma_output_header PrivateIpAddress NetworkInterfaceId ResourceType ResourceId
 
   local subnet_ids=$(skim-stdin "$@")
   [[ -z "$subnet_ids" ]] && __bma_usage "subnet-id [subnet-id...]" && return 1
@@ -480,7 +480,7 @@ network-interfaces() {
   #     PrivateIpAddress  PublicIp      NetworkInterfaceId    VpcId         SubnetId         Status  Description
   #     10.0.1.10         203.0.113.10  eni-1234567890abcdef  vpc-11223344  subnet-a1b2c3d4  in-use  ELB net/my-nlb/1234567890abcdef
 
-  __bma_output_header PrivateIpAddress	PublicIp	NetworkInterfaceId	VpcId	SubnetId	Status	Description
+  __bma_output_header PrivateIpAddress PublicIp NetworkInterfaceId VpcId SubnetId Status Description
 
   local filters=$(__bma_read_filters $@)
 

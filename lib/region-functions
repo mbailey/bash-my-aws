@@ -56,7 +56,7 @@ regions() {
   #     us-west-2
 
   {
-    __bma_output_header "REGION"
+    __bma_output_header REGION
     aws ec2 describe-regions           \
       --query "Regions[].[RegionName]" \
       --output text                    |

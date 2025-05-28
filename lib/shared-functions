@@ -81,9 +81,8 @@ __bma_output_header() {
   #   - never: No headers anywhere
   #
   # Usage:
-  #   __bma_output_header "INSTANCE_ID	AMI_ID	TYPE	STATE	NAME"
+  #   __bma_output_header INSTANCE_ID AMI_ID TYPE STATE NAME
   
-  local header="$1"
   local headers_mode="${BMA_HEADERS:-always}"
   
   case "$headers_mode" in
@@ -92,12 +91,12 @@ __bma_output_header() {
       ;;
     always)
       # Always output headers
-      printf "# %s\n" "$header"
+      printf "# %s\n" "$(printf "%s\t" "$@" | sed 's/\t$//')"
       ;;
     auto|*)
       # Output headers only when output is to a terminal
       if [[ -t 1 ]]; then
-        printf "# %s\n" "$header"
+        printf "# %s\n" "$(printf "%s\t" "$@" | sed 's/\t$//')"
       fi
       ;;
   esac

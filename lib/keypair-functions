@@ -17,12 +17,12 @@ keypairs() {
   local filters=$(__bma_read_filters $@)
 
   {
-    __bma_output_header "KEYPAIR_NAME	FINGERPRINT"
-    aws ec2 describe-key-pairs                       \
-      ${keypairs/#/'--key-names '}                   \
+    __bma_output_header KEYPAIR_NAME FINGERPRINT
+    aws ec2 describe-key-pairs \
+      ${keypairs/#/'--key-names '} \
       --query 'KeyPairs[].[KeyName, KeyFingerprint]' \
-      --output text       |
-    grep -E -- "$filters"
+      --output text |
+      grep -E -- "$filters"
   } | columnise
 }
 
@@ -79,8 +79,8 @@ keypair-create() {
   echo "Creating ${KEY_DIR}/${KEY_NAME}"
   ssh-keygen -t rsa -m PEM -b 4096 -o -a 100 -f "${KEY_DIR}/${KEY_NAME}"
   chmod 0600 "${KEY_DIR}/${KEY_NAME}"
-  aws ec2 import-key-pair                                 \
-    --key-name "$KEY_NAME"                                \
+  aws ec2 import-key-pair \
+    --key-name "$KEY_NAME" \
     --public-key-material "fileb://${KEY_DIR}/${KEY_NAME}.pub"
 }
 

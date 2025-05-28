@@ -27,11 +27,11 @@ This document outlines the coding conventions used in our project, particularly 
 
 ### Header Lines
 - Resource listing functions should use `__bma_output_header` to display column headers
-- Headers should be tab-separated to match the data format
+- Pass each column name as a separate argument (safer than tab-separated strings)
 - Headers appear as comment lines (starting with #) for easy filtering
 - Example:
   ```bash
-  __bma_output_header "INSTANCE_ID	AMI_ID	TYPE	STATE	NAME	LAUNCH_TIME	AZ	VPC"
+  __bma_output_header INSTANCE_ID AMI_ID TYPE STATE NAME LAUNCH_TIME AZ VPC
   ```
 
 ### Error Handling
