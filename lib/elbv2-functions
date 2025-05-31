@@ -16,20 +16,22 @@ elbv2s() {
   local elbv2_names=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
 
-  aws elbv2 describe-load-balancers \
-    ${elbv2_names/#/'--names '}     \
-    --output text                   \
-    --query "
-      LoadBalancers[][
-        LoadBalancerName,
-        Type,
-        Scheme,
-        State.Code,
-        CreatedTime
-      ]"                |
-  grep -E -- "$filters" |
-  LC_ALL=C sort -k 5    |
-    columnise
+  {
+    __bma_output_header LOAD_BALANCER_NAME TYPE SCHEME STATE CREATED_TIME
+    aws elbv2 describe-load-balancers \
+      ${elbv2_names/#/'--names '}     \
+      --output text                   \
+      --query "
+        LoadBalancers[][
+          LoadBalancerName,
+          Type,
+          Scheme,
+          State.Code,
+          CreatedTime
+        ]"                |
+    grep -E -- "$filters" |
+    LC_ALL=C sort -k 5
+  } | columnise
 }
 
 elbv2-dnsname(){
@@ -45,15 +47,17 @@ elbv2-dnsname(){
   local elbv2_names=$(skim-stdin "$@")
   [[ -z "${elbv2_names}" ]] && __bma_usage "load-balancer [load-balancer]" && return 1
 
-  aws elbv2 describe-load-balancers \
-    --names $elbv2_names            \
-    --output text                   \
-    --query "
-      LoadBalancers[][
-        LoadBalancerName,
-        DNSName
-      ]"              |
-    columnise
+  {
+    __bma_output_header LOAD_BALANCER_NAME DNS_NAME
+    aws elbv2 describe-load-balancers \
+      --names $elbv2_names            \
+      --output text                   \
+      --query "
+        LoadBalancers[][
+          LoadBalancerName,
+          DNSName
+        ]"
+  } | columnise
 }
 
 elbv2-subnets() {
@@ -69,15 +73,17 @@ elbv2-subnets() {
   local elbv2_names=$(skim-stdin "$@")
   [[ -z "${elbv2_names}" ]] && __bma_usage "load-balancer [load-balancer]" && return 1
 
-  aws elbv2 describe-load-balancers \
-    --names $elbv2_names            \
-    --output text                   \
-    --query "
-      LoadBalancers[][
-        LoadBalancerName,
-        join(' ', AvailabilityZones[].SubnetId)
-      ]"              |
-    columnise
+  {
+    __bma_output_header LOAD_BALANCER_NAME SUBNETS
+    aws elbv2 describe-load-balancers \
+      --names $elbv2_names            \
+      --output text                   \
+      --query "
+        LoadBalancers[][
+          LoadBalancerName,
+          join(' ', AvailabilityZones[].SubnetId)
+        ]"
+  } | columnise
 }
 
 elbv2-azs() {
@@ -93,15 +99,17 @@ elbv2-azs() {
   local elbv2_names=$(skim-stdin "$@")
   [[ -z $elbv2_names ]] && __bma_usage "load-balancer [load-balancer]" && return 1
 
-  aws elbv2 describe-load-balancers \
-    --names $elbv2_names            \
-    --output text                   \
-    --query "
-      LoadBalancers[][
-        LoadBalancerName,
-        join(' ', sort(AvailabilityZones[].ZoneName))
-      ]"              |
-    columnise
+  {
+    __bma_output_header LOAD_BALANCER_NAME AVAILABILITY_ZONES
+    aws elbv2 describe-load-balancers \
+      --names $elbv2_names            \
+      --output text                   \
+      --query "
+        LoadBalancers[][
+          LoadBalancerName,
+          join(' ', sort(AvailabilityZones[].ZoneName))
+        ]"
+  } | columnise
 }
 
 elbv2-target-groups() {
@@ -124,19 +132,21 @@ elbv2-target-groups() {
     --query 'LoadBalancers[*].LoadBalancerArn'
   )
 
-  for elbv2_arn in $elbv2_arns; do
-    aws elbv2 describe-target-groups   \
-      --load-balancer-arn "$elbv2_arn" \
-      --output text                    \
-      --query "
-        TargetGroups[][
-          TargetGroupName,
-          Protocol,
-          Port,
-          VpcId,
-          join(' ', LoadBalancerArns[])
-        ]"
-   done |
-   sed 's,arn:[^/]*:loadbalancer/[^/]*/\([^/]*\)[^[:blank:]]*,\1,g' |
-   column -s$'\t ' -t
+  {
+    __bma_output_header TARGET_GROUP_NAME PROTOCOL PORT VPC_ID LOAD_BALANCER_NAME
+    for elbv2_arn in $elbv2_arns; do
+      aws elbv2 describe-target-groups   \
+        --load-balancer-arn "$elbv2_arn" \
+        --output text                    \
+        --query "
+          TargetGroups[][
+            TargetGroupName,
+            Protocol,
+            Port,
+            VpcId,
+            join(' ', LoadBalancerArns[])
+          ]"
+    done |
+    sed 's,arn:[^/]*:loadbalancer/[^/]*/\([^/]*\)[^[:blank:]]*,\1,g'
+  } | column -s$'\t ' -t
 }

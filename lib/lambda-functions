@@ -21,18 +21,20 @@ lambda-functions() {
     column_command='column -t'
   fi
 
-  aws lambda list-functions \
-    --output text           \
-    --query "
-      Functions[${function_names:+?contains(['${function_names// /"','"}'], FunctionName)}].[
-        FunctionName,
-        LastModified,
-        Runtime,
-        MemorySize
-      ]"                |
-  grep -E -- "$filters" |
-  LC_ALL=C sort -b -k 2 |
-  $column_command
+  {
+    __bma_output_header FUNCTION_NAME LAST_MODIFIED RUNTIME MEMORY_SIZE
+    aws lambda list-functions \
+      --output text           \
+      --query "
+        Functions[${function_names:+?contains(['${function_names// /"','"}'], FunctionName)}].[
+          FunctionName,
+          LastModified,
+          Runtime,
+          MemorySize
+        ]"                |
+    grep -E -- "$filters" |
+    LC_ALL=C sort -b -k 2
+  } | $column_command
 }
 
 lambda-function-memory(){
@@ -51,14 +53,16 @@ lambda-function-memory(){
     column_command='column -t'
   fi
 
-  local function_name
-  for function_name in $function_names; do
-    aws lambda get-function                              \
-      --function-name "$function_name"                   \
-      --output text                                      \
-      --query 'Configuration.[FunctionName, MemorySize]'
-  done |
-  $column_command
+  {
+    __bma_output_header FUNCTION_NAME MEMORY_SIZE
+    local function_name
+    for function_name in $function_names; do
+      aws lambda get-function                              \
+        --function-name "$function_name"                   \
+        --output text                                      \
+        --query 'Configuration.[FunctionName, MemorySize]'
+    done
+  } | $column_command
 }
 
 

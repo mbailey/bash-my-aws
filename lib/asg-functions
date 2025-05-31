@@ -40,19 +40,21 @@ asgs() {
   local asg_names=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
 
-  # shellcheck disable=SC2086
-  aws autoscaling describe-auto-scaling-groups              \
-    ${asg_names/#/'--auto-scaling-group-names '}            \
-    --output text                                           \
-    --query "AutoScalingGroups[].[
-      AutoScalingGroupName,
-      join(',', [Tags[?Key=='Name'].Value || 'NO_NAME'][]),
-      CreatedTime,
-      join(',' sort(AvailabilityZones))
-    ]"                  |
-  grep -E -- "$filters" |
-  sort -k 3             |
-    columnise
+  {
+    __bma_output_header ASG_NAME NAME_TAG CREATED_TIME AVAILABILITY_ZONES
+    # shellcheck disable=SC2086
+    aws autoscaling describe-auto-scaling-groups              \
+      ${asg_names/#/'--auto-scaling-group-names '}            \
+      --output text                                           \
+      --query "AutoScalingGroups[].[
+        AutoScalingGroupName,
+        join(',', [Tags[?Key=='Name'].Value || 'NO_NAME'][]),
+        CreatedTime,
+        join(',' sort(AvailabilityZones))
+      ]"                  |
+    grep -E -- "$filters" |
+    sort -k 3
+  } | columnise
 }
 
 asg-capacity() {
@@ -62,17 +64,19 @@ asg-capacity() {
   local asg_names=$(skim-stdin "$@")
   [[ -z $asg_names ]] && __bma_usage "asg_name [asg_name]" && return 1
 
-  # shellcheck disable=SC2086
-  aws autoscaling describe-auto-scaling-groups \
-    --auto-scaling-group-names $asg_names      \
-    --output text                              \
-    --query "AutoScalingGroups[][
-      AutoScalingGroupName,
-      MinSize,
-      DesiredCapacity,
-      MaxSize
-    ]"              |
-    columnise
+  {
+    __bma_output_header ASG_NAME MIN_SIZE DESIRED_CAPACITY MAX_SIZE
+    # shellcheck disable=SC2086
+    aws autoscaling describe-auto-scaling-groups \
+      --auto-scaling-group-names $asg_names      \
+      --output text                              \
+      --query "AutoScalingGroups[][
+        AutoScalingGroupName,
+        MinSize,
+        DesiredCapacity,
+        MaxSize
+      ]"
+  } | columnise
 }
 
 asg-desired-size-set() {
@@ -147,16 +151,18 @@ launch-configurations() {
   local launch_configuration_names=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
 
-  aws autoscaling describe-launch-configurations                    \
-    ${launch_configuration_names/#/'--launch-configuration-names '} \
-    --output text                                                   \
-    --query "
-      LaunchConfigurations[].[
-        LaunchConfigurationName,
-        ImageId,
-        InstanceType
-    ]" |
-    columnise
+  {
+    __bma_output_header LAUNCH_CONFIG_NAME IMAGE_ID INSTANCE_TYPE
+    aws autoscaling describe-launch-configurations                    \
+      ${launch_configuration_names/#/'--launch-configuration-names '} \
+      --output text                                                   \
+      --query "
+        LaunchConfigurations[].[
+          LaunchConfigurationName,
+          ImageId,
+          InstanceType
+      ]"
+  } | columnise
 }
 
 launch-configuration-asgs() {
@@ -169,17 +175,19 @@ launch-configuration-asgs() {
     return 1
   fi
 
-  local launch_configuration_name
-  for launch_configuration_name in $launch_configuration_names; do
-    echo -n "$launch_configuration_name "
-    aws autoscaling describe-auto-scaling-groups                                  \
-      --output text                                                               \
-      --query "join(',',
-        AutoScalingGroups[?LaunchConfigurationName=='$launch_configuration_name'].
-          AutoScalingGroupName
-        )"
-  done |
-    columnise
+  {
+    __bma_output_header LAUNCH_CONFIG_NAME ASG_NAMES
+    local launch_configuration_name
+    for launch_configuration_name in $launch_configuration_names; do
+      echo -n "$launch_configuration_name "
+      aws autoscaling describe-auto-scaling-groups                                  \
+        --output text                                                               \
+        --query "join(',',
+          AutoScalingGroups[?LaunchConfigurationName=='$launch_configuration_name'].
+            AutoScalingGroupName
+          )"
+    done
+  } | columnise
 }
 
 asg-max-size-set() {
@@ -230,15 +238,17 @@ asg-processes_suspended() {
   local asg_names=$(skim-stdin "$@")
   [[ -z $asg_names ]] && __bma_usage "asg_name [asg_name]" && return 1
 
-  # shellcheck disable=SC2086
-  aws autoscaling describe-auto-scaling-groups \
-    --auto-scaling-group-names $asg_names      \
-    --output text                              \
-    --query "AutoScalingGroups[][
-      AutoScalingGroupName,
-      SuspendedProcesses
-    ]"              |
-    columnise
+  {
+    __bma_output_header ASG_NAME SUSPENDED_PROCESSES
+    # shellcheck disable=SC2086
+    aws autoscaling describe-auto-scaling-groups \
+      --auto-scaling-group-names $asg_names      \
+      --output text                              \
+      --query "AutoScalingGroups[][
+        AutoScalingGroupName,
+        SuspendedProcesses
+      ]"
+  } | columnise
 }
 
 asg-resume() {
@@ -275,15 +285,17 @@ asg-stack() {
   local asg_names=$(skim-stdin "$@")
   [[ -z $asg_names ]] && __bma_usage "asg_name [asg_name]" && return 1
 
-  # shellcheck disable=SC2086
-  aws autoscaling describe-auto-scaling-groups                       \
-    --auto-scaling-group-names $asg_names                            \
-    --output text                                                    \
-    --query "AutoScalingGroups[].[
-      [Tags[?Key=='aws:cloudformation:stack-name'].Value][0][0],
-      AutoScalingGroupName
-    ]"              |
-    columnise
+  {
+    __bma_output_header STACK_NAME ASG_NAME
+    # shellcheck disable=SC2086
+    aws autoscaling describe-auto-scaling-groups                       \
+      --auto-scaling-group-names $asg_names                            \
+      --output text                                                    \
+      --query "AutoScalingGroups[].[
+        [Tags[?Key=='aws:cloudformation:stack-name'].Value][0][0],
+        AutoScalingGroupName
+      ]"
+  } | columnise
 }
 
 asg-scaling-activities() {

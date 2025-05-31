@@ -9,18 +9,20 @@ ecr-repositories() {
   local aws_account_id=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
 
-  aws ecr describe-repositories          \
-    ${aws_account_id/#/'--registry-id '} \
-    --query "
-      repositories[].[
-        repositoryName,
-        registryId,
-        repositoryUri
-      ]"                        \
-    --output text       |
-  grep -E -- "$filters" |
-  LC_ALL=C sort -b -k 1 |
-    columnise
+  {
+    __bma_output_header REPOSITORY_NAME REGISTRY_ID REPOSITORY_URI
+    aws ecr describe-repositories          \
+      ${aws_account_id/#/'--registry-id '} \
+      --query "
+        repositories[].[
+          repositoryName,
+          registryId,
+          repositoryUri
+        ]"                        \
+      --output text       |
+    grep -E -- "$filters" |
+    LC_ALL=C sort -b -k 1
+  } | columnise
 }
 
 ecr-repository-images() {
@@ -35,24 +37,25 @@ ecr-repository-images() {
 
   # XXX Display USAGE if no repository_names passed in
 
-  local repository_name
-  for repository_name in $repository_names; do
-    echo '#'
-    aws ecr describe-images                                         \
-      $([[ -n $registry_id ]] && echo --registry-id "$registry_id") \
-      --repository-name "$repository_name"                          \
-      --output text                                                 \
-      --query "
-        imageDetails[].[
-          repositoryName,
-          registryId,
-          join('=', ['BYTES',to_string(imageSizeInBytes)]),
-          join('=', ['PUSHED_AT',to_string(imagePushedAt)]),
-          join('=', ['DIGEST',to_string(imageDigest)]),
-          join(',', [imageTags][])
-        ]"                                           |
-    LC_ALL=C sort -b -k 4                            |
-    sed -E 's/DIGEST=.*:(.{12})\S*/\1/g' # short sha
-  done |
-    columnise
+  {
+    __bma_output_header REPOSITORY_NAME REGISTRY_ID SIZE PUSHED_AT DIGEST IMAGE_TAGS
+    local repository_name
+    for repository_name in $repository_names; do
+      aws ecr describe-images                                         \
+        $([[ -n $registry_id ]] && echo --registry-id "$registry_id") \
+        --repository-name "$repository_name"                          \
+        --output text                                                 \
+        --query "
+          imageDetails[].[
+            repositoryName,
+            registryId,
+            join('=', ['BYTES',to_string(imageSizeInBytes)]),
+            join('=', ['PUSHED_AT',to_string(imagePushedAt)]),
+            join('=', ['DIGEST',to_string(imageDigest)]),
+            join(',', [imageTags][])
+          ]"                                           |
+      LC_ALL=C sort -b -k 4                            |
+      sed -E 's/DIGEST=.*:(.{12})\S*/\1/g' # short sha
+    done
+  } | columnise
 }

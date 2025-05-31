@@ -17,19 +17,21 @@ rds-db-instances() {
 
   local filters=$(__bma_read_filters "$@")
 
-  aws rds describe-db-instances \
-    --output text               \
-    --query "DBInstances[].[
-        DBInstanceIdentifier,
-        Engine,
-        EngineVersion,
-        DBInstanceStatus,
-        DBName,
-        DBClusterIdentifier
-      ]"                |
-  grep -E -- "$filters" |
-  LC_ALL=C sort -b -k 1 |
-    columnise
+  {
+    __bma_output_header DB_INSTANCE_ID ENGINE ENGINE_VERSION STATUS DB_NAME DB_CLUSTER_ID
+    aws rds describe-db-instances \
+      --output text               \
+      --query "DBInstances[].[
+          DBInstanceIdentifier,
+          Engine,
+          EngineVersion,
+          DBInstanceStatus,
+          DBName,
+          DBClusterIdentifier
+        ]"                |
+    grep -E -- "$filters" |
+    LC_ALL=C sort -b -k 1
+  } | columnise
 }
 
 
@@ -40,16 +42,18 @@ rds-db-clusters() {
 
   local filters=$(__bma_read_filters "$@")
 
-  aws rds describe-db-clusters \
-    --output text              \
-    --query "DBClusters[].[
-        DBClusterIdentifier,
-        Engine,
-        EngineVersion,
-        Status,
-        ClusterCreateTime
-      ]"                |
-  grep -E -- "$filters" |
-  LC_ALL=C sort -b -k 5 |
-    columnise
+  {
+    __bma_output_header DB_CLUSTER_ID ENGINE ENGINE_VERSION STATUS CLUSTER_CREATE_TIME
+    aws rds describe-db-clusters \
+      --output text              \
+      --query "DBClusters[].[
+          DBClusterIdentifier,
+          Engine,
+          EngineVersion,
+          Status,
+          ClusterCreateTime
+        ]"                |
+    grep -E -- "$filters" |
+    LC_ALL=C sort -b -k 5
+  } | columnise
 }

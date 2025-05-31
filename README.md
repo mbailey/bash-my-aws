@@ -384,3 +384,19 @@ instances() {
 ```
 
 For more info on AWSCLI query syntax, check out [http://jmespath.org/tutorial.html](http://jmespath.org/tutorial.html)
+
+## Development
+
+### Contributing Functions
+
+bash-my-aws provides comprehensive templates and guides for implementing new functions:
+
+- **[Function Taxonomy](docs/function-taxonomy.md)** - Complete classification of function types, naming conventions, and patterns
+- **[Function Templates](docs/function-templates/)** - Copy-paste ready templates for each function type:
+  - Query functions (resource listing): `instances`, `stacks`, `buckets`
+  - Detail functions (resource attributes): `instance-state`, `stack-outputs`
+  - Action functions (resource operations): `instance-terminate`, `stack-create`
+- **[Developer Guide](docs/developer-guide.md)** - Implementation principles and patterns
+- **[Implementation Checklist](docs/header-implementation-checklist.md)** - Quick reference for function development
+
+These templates include comprehensive examples, error handling patterns, safety checks, and customization checklists to ensure consistent, reliable implementations across all bash-my-aws functions.

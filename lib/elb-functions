@@ -16,17 +16,19 @@ elbs() {
   local elb_names=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
 
-  aws elb describe-load-balancers           \
-    ${elb_names/#/'--load-balancer-names '} \
-    --output text                           \
-    --query "
-      LoadBalancerDescriptions[][
-        LoadBalancerName,
-        CreatedTime
-      ]"                |
-  grep -E -- "$filters" |
-  LC_ALL=C sort -k 2    |
-    columnise
+  {
+    __bma_output_header LOAD_BALANCER_NAME CREATED_TIME
+    aws elb describe-load-balancers           \
+      ${elb_names/#/'--load-balancer-names '} \
+      --output text                           \
+      --query "
+        LoadBalancerDescriptions[][
+          LoadBalancerName,
+          CreatedTime
+        ]"                |
+    grep -E -- "$filters" |
+    LC_ALL=C sort -k 2
+  } | columnise
 }
 
 elb-dnsname(){
@@ -42,15 +44,17 @@ elb-dnsname(){
   local elb_names=$(skim-stdin "$@")
   [[ -z $elb_names ]] && __bma_usage "load-balancer [load-balancer]" && return 1
 
-  aws elb describe-load-balancers           \
-    ${elb_names/#/'--load-balancer-names '} \
-    --output text                           \
-    --query "
-      LoadBalancerDescriptions[][
-        LoadBalancerName,
-        DNSName
-      ]"              |
-    columnise
+  {
+    __bma_output_header LOAD_BALANCER_NAME DNS_NAME
+    aws elb describe-load-balancers           \
+      ${elb_names/#/'--load-balancer-names '} \
+      --output text                           \
+      --query "
+        LoadBalancerDescriptions[][
+          LoadBalancerName,
+          DNSName
+        ]"
+  } | columnise
 }
 
 elb-instances() {
@@ -62,20 +66,22 @@ elb-instances() {
   local elb_names=$(skim-stdin "$@")
   [[ -z "${elb_names}" ]] && __bma_usage "load-balancer [load-balancer]" && return 1
 
-  local elb_name
-  for elb_name in $elb_names; do
-    aws elb describe-instance-health   \
-      --load-balancer-name "$elb_name" \
-      --output text                    \
-      --query "
-        InstanceStates[][
-          InstanceId,
-          State,
-          ReasonCode,
-          '${elb_name}'
-        ]"              |
-      columnise
-  done
+  {
+    __bma_output_header INSTANCE_ID STATE REASON_CODE LOAD_BALANCER_NAME
+    local elb_name
+    for elb_name in $elb_names; do
+      aws elb describe-instance-health   \
+        --load-balancer-name "$elb_name" \
+        --output text                    \
+        --query "
+          InstanceStates[][
+            InstanceId,
+            State,
+            ReasonCode,
+            '${elb_name}'
+          ]"
+    done
+  } | columnise
 }
 
 elb-stack() {
@@ -91,15 +97,17 @@ elb-stack() {
   local elb_names=$(skim-stdin "$@")
   [[ -z "$elb_names" ]] && __bma_usage "load-balancer [load-balancer]" && return 1
 
-  aws elb describe-tags                                            \
-    --load-balancer-names $elb_names                               \
-    --output text                                                  \
-    --query "
-      TagDescriptions[].[
-        [Tags[?Key=='aws:cloudformation:stack-name'].Value][0][0],
-        LoadBalancerName
-      ]"            |
-    columnise
+  {
+    __bma_output_header STACK_NAME LOAD_BALANCER_NAME
+    aws elb describe-tags                                            \
+      --load-balancer-names $elb_names                               \
+      --output text                                                  \
+      --query "
+        TagDescriptions[].[
+          [Tags[?Key=='aws:cloudformation:stack-name'].Value][0][0],
+          LoadBalancerName
+        ]"
+  } | columnise
 }
 
 elb-subnets() {
@@ -116,15 +124,17 @@ elb-subnets() {
   local elb_names=$(skim-stdin "$@")
   [[ -z "$elb_names" ]] && __bma_usage "load-balancer [load-balancer]" && return 1
 
-  aws elb describe-load-balancers    \
-    --load-balancer-names $elb_names \
-    --output text                    \
-    --query "
-      LoadBalancerDescriptions[][
-        LoadBalancerName,
-        join(' ', sort(Subnets))
-      ]"              |
-    columnise
+  {
+    __bma_output_header LOAD_BALANCER_NAME SUBNETS
+    aws elb describe-load-balancers    \
+      --load-balancer-names $elb_names \
+      --output text                    \
+      --query "
+        LoadBalancerDescriptions[][
+          LoadBalancerName,
+          join(' ', sort(Subnets))
+        ]"
+  } | columnise
 }
 
 elb-azs() {
@@ -140,15 +150,17 @@ elb-azs() {
   local elb_names=$(skim-stdin "$@")
   [[ -z $elb_names ]] && __bma_usage "load-balancer [load-balancer]" && return 1
 
-  aws elb describe-load-balancers          \
-    --load-balancer-names $elb_names       \
-    --output text                          \
-    --query "
-      LoadBalancerDescriptions[][
-        LoadBalancerName,
-        join(' ', sort(AvailabilityZones))
-      ]"              |
-    columnise
+  {
+    __bma_output_header LOAD_BALANCER_NAME AVAILABILITY_ZONES
+    aws elb describe-load-balancers          \
+      --load-balancer-names $elb_names       \
+      --output text                          \
+      --query "
+        LoadBalancerDescriptions[][
+          LoadBalancerName,
+          join(' ', sort(AvailabilityZones))
+        ]"
+  } | columnise
 }
 
 elb-tags() {
@@ -160,16 +172,18 @@ elb-tags() {
   local elb_ids=$(skim-stdin "$@")
   [[ -z $elb_ids ]] && __bma_usage "elb-id [elb-id]" && return 1
 
-  aws elb describe-tags                            \
-    --load-balancer-names $elb_ids                 \
-    --output text                                  \
-    --query "
-      TagDescriptions[].[
-        LoadBalancerName,
-        join(' ', [Tags[].[join('=',[Key,Value])][]][])
-      ]
-      "            |
-    columnise
+  {
+    __bma_output_header LOAD_BALANCER_NAME TAGS
+    aws elb describe-tags                            \
+      --load-balancer-names $elb_ids                 \
+      --output text                                  \
+      --query "
+        TagDescriptions[].[
+          LoadBalancerName,
+          join(' ', [Tags[].[join('=',[Key,Value])][]][])
+        ]
+        "
+  } | columnise
 }
 
 elb-tag() {
@@ -183,11 +197,13 @@ elb-tag() {
   local elb_ids=$(skim-stdin "$@")
   [[ -z $key ]] && __bma_usage "key elb-id [elb-id]" && return 1
 
-  aws elb describe-tags                          \
-    --load-balancer-names $elb_ids               \
-    --output text                                \
-    --query "TagDescriptions[].[
-       [ LoadBalancerName, Tags[?Key=='$key'][Key,Value][] ][]
-     ][]" |
-    columnise
+  {
+    __bma_output_header LOAD_BALANCER_NAME KEY VALUE
+    aws elb describe-tags                          \
+      --load-balancer-names $elb_ids               \
+      --output text                                \
+      --query "TagDescriptions[].[
+         [ LoadBalancerName, Tags[?Key=='$key'][Key,Value][] ][]
+       ][]"
+  } | columnise
 }

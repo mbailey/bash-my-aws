@@ -20,17 +20,19 @@ iam-roles() {
   local role_names=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
 
-  aws iam list-roles    \
-    --output text       \
-    --query "
-      Roles[${role_names:+?contains(['${role_names// /"','"}'], RoleName)}].[
-        RoleName,
-        RoleId,
-        CreateDate
-    ]"                  |
-  grep -E -- "$filters" |
-  LC_ALL=C sort -b -k 3 |
-    columnise
+  {
+    __bma_output_header ROLE_NAME ROLE_ID CREATE_DATE
+    aws iam list-roles    \
+      --output text       \
+      --query "
+        Roles[${role_names:+?contains(['${role_names// /"','"}'], RoleName)}].[
+          RoleName,
+          RoleId,
+          CreateDate
+      ]"                  |
+    grep -E -- "$filters" |
+    LC_ALL=C sort -b -k 3
+  } | columnise
 }
 
 iam-role-principal(){
@@ -42,18 +44,20 @@ iam-role-principal(){
   local role_names=$(skim-stdin "$@")
   [[ -z "$role_names" ]] && __bma_usage "role-name [role-name]" && return 1
 
-  aws iam list-roles                                                         \
-    --output text                                                            \
-    --query "
-      Roles[?contains('$role_names', RoleName)].[
-        RoleName,
-        AssumeRolePolicyDocument.Statement[0].Effect,
-        AssumeRolePolicyDocument.Statement[0].Action,
-        join('', keys(AssumeRolePolicyDocument.Statement[0].Principal)),
-        join(',', values(AssumeRolePolicyDocument.Statement[0].Principal)[])
-    ]"              |
-  LC_ALL=C sort     |
-    columnise
+  {
+    __bma_output_header ROLE_NAME EFFECT ACTION PRINCIPAL_TYPE PRINCIPAL_VALUES
+    aws iam list-roles                                                         \
+      --output text                                                            \
+      --query "
+        Roles[?contains('$role_names', RoleName)].[
+          RoleName,
+          AssumeRolePolicyDocument.Statement[0].Effect,
+          AssumeRolePolicyDocument.Statement[0].Action,
+          join('', keys(AssumeRolePolicyDocument.Statement[0].Principal)),
+          join(',', values(AssumeRolePolicyDocument.Statement[0].Principal)[])
+      ]"              |
+    LC_ALL=C sort
+  } | columnise
 }
 
 iam-users() {
@@ -67,17 +71,19 @@ iam-users() {
 
   local filters=$(__bma_read_filters $@)
 
-  aws iam list-users    \
-    --output text       \
-    --query '
-      Users[].[
-        UserName,
-        UserId,
-        CreateDate
-    ]'                  |
-  grep -E -- "$filters" |
-  LC_ALL=C sort -b -k 3 |
-    columnise
+  {
+    __bma_output_header USER_NAME USER_ID CREATE_DATE
+    aws iam list-users    \
+      --output text       \
+      --query '
+        Users[].[
+          UserName,
+          UserId,
+          CreateDate
+      ]'                  |
+    grep -E -- "$filters" |
+    LC_ALL=C sort -b -k 3
+  } | columnise
 }
 
 iam-access-key-rotate() {

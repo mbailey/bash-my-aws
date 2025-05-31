@@ -17,6 +17,19 @@ EC2 instance may be something like *terminate* or *associate_eip*.
 
 e.g. stack-create(), instance-terminate(), asg-suspend()
 
+## Function Templates and Implementation Guide
+
+For detailed implementation guidance, refer to these resources:
+
+- **[Function Taxonomy](function-taxonomy.md)** - Comprehensive classification of function types, naming conventions, and usage patterns
+- **[Function Templates](function-templates/)** - Copy-paste ready templates for each function type:
+  - `query-function-template.sh` - For resource listing functions
+  - `detail-function-template.sh` - For resource attribute functions  
+  - `action-function-template.sh` - For resource operation functions
+- **[Header Implementation Guide](implementing-headers-guide.md)** - How to add column headers to functions
+- **[Implementation Checklist](header-implementation-checklist.md)** - Quick reference for function development
+
+These templates include comprehensive examples, common patterns, error handling, and customization checklists to ensure consistent implementation across all bash-my-aws functions.
 
 There are some great things about `bash-my-aws` which I would hate to lose.
 

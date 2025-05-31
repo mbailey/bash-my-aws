@@ -14,18 +14,20 @@ hosted-zones(){
   local ids=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
 
-  aws route53 list-hosted-zones \
-    --output text               \
-    --query "
-      HostedZones[${ids:+?contains(['${ids// /"','"}'], Id)}].[
-        Id,
-        ResourceRecordSetCount,
-        (Config.PrivateZone && 'PrivateZone') || 'NotPrivateZone',
-        Name
-      ]"                |
-  sort -k 4             |
-  grep -E -- "$filters" |
-    columnise
+  {
+    __bma_output_header HOSTED_ZONE_ID RECORD_COUNT TYPE NAME
+    aws route53 list-hosted-zones \
+      --output text               \
+      --query "
+        HostedZones[${ids:+?contains(['${ids// /"','"}'], Id)}].[
+          Id,
+          ResourceRecordSetCount,
+          (Config.PrivateZone && 'PrivateZone') || 'NotPrivateZone',
+          Name
+        ]"                |
+    sort -k 4             |
+    grep -E -- "$filters"
+  } | columnise
 }
 
 hosted-zone-ns-records(){
