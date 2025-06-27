@@ -343,15 +343,25 @@ bucket-inventory-destination() {
       --query "
         InventoryConfigurationList[0].[
           '$bucket',
-          Destination.S3BucketDestination.Bucket || 'NO_INVENTORY',
-          Destination.S3BucketDestination.Prefix || 'NO_INVENTORY'
+          Destination.S3BucketDestination.Bucket,
+          Destination.S3BucketDestination.Prefix
         ]" 2>/dev/null)
     
     # If result is empty or None, bucket has no inventory configuration
     if [[ -z "$result" || "$result" == "None" ]]; then
       echo -e "$bucket\tNO_INVENTORY\tNO_INVENTORY"
     else
-      echo "$result"
+      # Handle the case where prefix might be empty (tab-separated values)
+      echo "$result" | awk -F'\t' '{
+        OFS="\t"
+        if ($2 == "" || $2 == "None") {
+          print $1, "NO_INVENTORY", "NO_INVENTORY"
+        } else if ($3 == "") {
+          print $1, $2, "(root)"
+        } else {
+          print $0
+        }
+      }'
     fi
   done |
     columnise
