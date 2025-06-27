@@ -346,7 +346,7 @@ bucket-inventory-destination() {
           Destination.S3BucketDestination.Bucket,
           Destination.S3BucketDestination.Prefix
         ]" 2>/dev/null)
-    
+
     # If result is empty or None, bucket has no inventory configuration
     if [[ -z "$result" || "$result" == "None" ]]; then
       echo -e "$bucket\tNO_INVENTORY\tNO_INVENTORY"
@@ -368,8 +368,6 @@ bucket-inventory-destination() {
 }
 
 bucket-inventory-status() {
-
-  set -x
 
   # Show inventory configuration status for S3 buckets
   #
@@ -396,7 +394,7 @@ bucket-inventory-status() {
           Destination.S3BucketDestination.Format || 'NO_CONFIG',
           Id || 'NO_CONFIG'
         ]" 2>/dev/null)
-    
+
     # If result is empty or None, bucket has no inventory configuration
     if [[ -z "$result" || "$result" == "None" ]]; then
       echo -e "$bucket\tNOT_CONFIGURED\tNOT_CONFIGURED\tNOT_CONFIGURED\tNOT_CONFIGURED"
