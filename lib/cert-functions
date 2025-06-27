@@ -30,6 +30,7 @@ certs() {
           $include_arn_bit
           DomainName,
           Status,
+          Type,
           length(InUseBy)==\`0\` && 'not-in-use' || 'in-use',
           NotBefore,
           NotAfter,

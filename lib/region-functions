@@ -1,8 +1,41 @@
 #!/bin/bash
 #
 # region-functions
-#
 
+# There is often confusion around the two environment variables:
+#
+# - AWS_DEFAULT_REGION 
+# - AWS_REGION
+#
+# AWS_REGION takes precedence in AWSCLI and some other tools
+
+# Configuring environment variables for the AWS CLI
+#
+# https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html
+#
+# AWS_REGION
+#
+# The AWS SDK compatible environment variable that specifies the AWS Region to send the request to.
+# 
+# If defined, this environment variable overrides the values in the environment variable AWS_DEFAULT_REGION and the profile setting region. You can override this environment variable by using the --region command line parameter.
+#
+# AWS_DEFAULT_REGION
+#
+# The Default region name identifies the AWS Region whose servers you want to
+# send your requests to by default. This is typically the Region closest to
+# you, but it can be any Region. For example, you can type us-west-2 to use US
+# West (Oregon). This is the Region that all later requests are sent to, unless
+# you specify otherwise in an individual command.
+# 
+# Note: You must specify an AWS Region when using the AWS CLI, either explicitly
+# or by setting a default Region. For a list of the available Regions, see
+# Regions and Endpoints. The Region designators used by the AWS CLI are the
+# same names that you see in AWS Management Console URLs and service endpoints.
+# 
+# If defined, this environment variable overrides the value for the profile
+# setting region. You can override this environment variable by using the
+# --region command line parameter and the AWS SDK compatible AWS_REGION
+# environment variable.
 
 regions() {
 
@@ -53,7 +86,6 @@ region() {
   fi
 }
 
-
 region-each() {
 
   # Run a command in every region.
@@ -65,11 +97,13 @@ region-each() {
   #     ...
   #     example-ec2-us-west-2       CREATE_COMPLETE  2011-05-23T15:47:44Z  NEVER_UPDATED  NOT_NESTED  #us-west-2
 
-  local old_aws_default_region="$AWS_DEFAULT_REGION"
-  export AWS_DEFAULT_REGION
-  for AWS_DEFAULT_REGION in $(regions); do
-    eval "$@" | sed "s/$/ #${AWS_DEFAULT_REGION}/"
+  local region
+  for region in $(regions); do
+    (
+      export AWS_DEFAULT_REGION="${region}"
+      export AWS_REGION="${region}"
+      eval "$@" | sed "s/$/ #${region}/"
+    )
   done
-  AWS_DEFAULT_REGION="$old_aws_default_region"
 }
 

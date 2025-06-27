@@ -26,13 +26,14 @@ bmai() {
     # and truncating to 50 chars
     local filename=$(echo "$*" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | cut -c1-50)
    
-    local ai_slop_bucket="${BMA_HOME:-$HOME/.bash-my-aws}/contrib/ai/slop"
-    mkdir -p "${ai_slop_bucket}"
+    local ai_slop_dir="${BMA_HOME:-$HOME/.bash-my-aws}/contrib/ai/slop"
+    mkdir -p "${ai_slop_dir}"
+    local output_file="${ai_slop_dir}/${filename}"
     
     llm prompt \
         -s "$(<"${conventions}")" \
         "Do not provide a preamble or closing comments. Output only an authentic bash-my-aws command that follows the conventions and does the following: '$@'" \
-    | tee "${ai_slop_bucket}"
+    | tee "${output_file}"
 }
 
 # Execute function with same name as file called unless sourced

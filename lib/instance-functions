@@ -573,6 +573,13 @@ instance-tags() {
   # List tags applied EC2 Instance(s)
   #
   #     USAGE: instance-tags instance-id [instance-id]
+  #
+  #     $ instances | instance-tags
+  #     i-4e15ece1de1a3f869  Name=nagios Role=monitoring Team=platform
+  #     i-89cefa9403373d7a5  Name=postgres1 Role=database Team=platform
+  #     i-806d8f1592e2a2efd  Name=postgres2 Role=database Team=platform
+  #
+  # Note: For clearer output with one tag per line, see instance-tags-v2
 
   local instance_ids=$(skim-stdin "$@")
   [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
@@ -585,6 +592,31 @@ instance-tags() {
         InstanceId,
         join(' ', [Tags[].[join('=',[Key,Value])][]][])
       ]"            |
+    columnise
+}
+
+instance-tags-v2() {
+
+  # List tags applied EC2 Instance(s)
+  #
+  #     USAGE: instance-tags instance-id [instance-id]
+  #
+  #     $ instances | instance-tags-v2
+  #     i-4e15ece1de1a3f869  Name         nagios
+  #     i-4e15ece1de1a3f869  Role         monitoring
+  #     i-4e15ece1de1a3f869  Team         platform
+  #     i-89cefa9403373d7a5  Name         postgres1
+  #     i-89cefa9403373d7a5  Role         database
+  #     i-89cefa9403373d7a5  Team         platform
+
+  local instance_ids=$(skim-stdin "$@")
+  [[ -z $instance_ids ]] && __bma_usage "instance-id [instance-id]" && return 1
+
+  aws ec2 describe-instances                            \
+    --instance-ids $instance_ids                        \
+    --output json                                       \
+    --query "Reservations[].Instances[]" |
+    jq -r '.[] | .InstanceId as $id | .Tags[] | [$id, .Key, .Value] | @tsv' |
     columnise
 }
 
