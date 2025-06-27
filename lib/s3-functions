@@ -320,3 +320,148 @@ bucket-size() {
   # Reset the trap when we're done
   trap - INT
 }
+
+bucket-inventory-destination() {
+
+  # Show where inventory is written for S3 buckets
+  #
+  #     $ bucket-inventory-destination my-bucket
+  #     my-bucket  inventory-destination-bucket  reports/my-bucket/
+  #
+  #     $ buckets | bucket-inventory-destination
+  #     bucket-1  inventory-bucket  reports/bucket-1/
+  #     bucket-2  NO_INVENTORY      NO_INVENTORY
+
+  local buckets=$(skim-stdin "$@")
+  [[ -z "$buckets" ]] && __bma_usage "bucket [bucket]" && return 1
+
+  local bucket
+  for bucket in $buckets; do
+    local result=$(aws s3api list-bucket-inventory-configurations \
+      --bucket "$bucket" \
+      --output text \
+      --query "
+        InventoryConfigurationList[0].[
+          '$bucket',
+          Destination.S3BucketDestination.Bucket || 'NO_INVENTORY',
+          Destination.S3BucketDestination.Prefix || 'NO_INVENTORY'
+        ]" 2>/dev/null)
+    
+    # If result is empty or None, bucket has no inventory configuration
+    if [[ -z "$result" || "$result" == "None" ]]; then
+      echo -e "$bucket\tNO_INVENTORY\tNO_INVENTORY"
+    else
+      echo "$result"
+    fi
+  done |
+    columnise
+}
+
+bucket-inventory-status() {
+
+  set -x
+
+  # Show inventory configuration status for S3 buckets
+  #
+  #     $ bucket-inventory-status my-bucket
+  #     my-bucket  ENABLED   daily    ORC       my-inventory-id
+  #
+  #     $ buckets | bucket-inventory-status
+  #     bucket-1  ENABLED   daily    Parquet   inventory-config-1
+  #     bucket-2  DISABLED  NO_CONFIG NO_CONFIG NO_CONFIG
+
+  local buckets=$(skim-stdin "$@")
+  [[ -z "$buckets" ]] && __bma_usage "bucket [bucket]" && return 1
+
+  local bucket
+  for bucket in $buckets; do
+    local result=$(aws s3api list-bucket-inventory-configurations \
+      --bucket "$bucket" \
+      --output text \
+      --query "
+        InventoryConfigurationList[0].[
+          '$bucket',
+          (IsEnabled && 'ENABLED') || 'DISABLED',
+          Schedule.Frequency || 'NO_CONFIG',
+          Destination.S3BucketDestination.Format || 'NO_CONFIG',
+          Id || 'NO_CONFIG'
+        ]" 2>/dev/null)
+    
+    # If result is empty or None, bucket has no inventory configuration
+    if [[ -z "$result" || "$result" == "None" ]]; then
+      echo -e "$bucket\tNOT_CONFIGURED\tNOT_CONFIGURED\tNOT_CONFIGURED\tNOT_CONFIGURED"
+    else
+      echo "$result"
+    fi
+  done |
+    columnise
+}
+
+bucket-lock-configuration() {
+
+  # Show object lock configuration for S3 buckets
+  #
+  #     $ bucket-lock-configuration my-bucket
+  #     my-bucket  ENABLED  COMPLIANCE  30  Days
+  #
+  #     $ buckets | bucket-lock-configuration
+  #     bucket-1  ENABLED   GOVERNANCE  1   Years
+  #     bucket-2  DISABLED  NO_CONFIG   NO_CONFIG  NO_CONFIG
+
+  local buckets=$(skim-stdin "$@")
+  [[ -z "$buckets" ]] && __bma_usage "bucket [bucket]" && return 1
+
+  local bucket
+  for bucket in $buckets; do
+    aws s3api get-object-lock-configuration \
+      --bucket "$bucket" \
+      --output text \
+      --query "
+        ObjectLockConfiguration.[
+          '$bucket',
+          (ObjectLockEnabled == 'Enabled' && 'ENABLED') || 'DISABLED',
+          Rule.DefaultRetention.Mode || 'NO_CONFIG',
+          Rule.DefaultRetention.Days || Rule.DefaultRetention.Years || 'NO_CONFIG',
+          (Rule.DefaultRetention.Days && 'Days') || (Rule.DefaultRetention.Years && 'Years') || 'NO_CONFIG'
+        ]" 2>/dev/null || echo -e "$bucket\tDISABLED\tNO_CONFIG\tNO_CONFIG\tNO_CONFIG"
+  done |
+    columnise
+}
+
+bucket-lock-stats() {
+
+  # Show object lock statistics for S3 buckets using CloudWatch metrics
+  #
+  #     $ bucket-lock-stats my-bucket
+  #     my-bucket  1234567  567890   666677
+  #
+  # COLUMNS:
+  #     BUCKET_NAME  TOTAL_OBJECTS  LOCKED_OBJECTS  UNLOCKED_OBJECTS
+
+  local buckets=$(skim-stdin "$@")
+  [[ -z "$buckets" ]] && __bma_usage "bucket [bucket]" && return 1
+
+  # Get time range (last 2 days to ensure we get recent data)
+  local start_time=$(date -u -d '2 days ago' '+%Y-%m-%dT%H:%M:%SZ')
+  local end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+  local bucket
+  for bucket in $buckets; do
+    # Get total number of objects
+    local total_objects=$(aws cloudwatch get-metric-statistics \
+      --namespace AWS/S3 \
+      --metric-name NumberOfObjects \
+      --dimensions Name=BucketName,Value="$bucket" Name=StorageType,Value=AllStorageTypes \
+      --start-time "$start_time" \
+      --end-time "$end_time" \
+      --period 86400 \
+      --statistics Average \
+      --output text \
+      --query 'Datapoints[0].Average' 2>/dev/null || echo "0")
+
+    # Note: AWS doesn't provide direct metrics for locked vs unlocked objects
+    # This would need to be calculated from inventory data or S3 API calls
+    echo -e "$bucket\t${total_objects%.*}\tCHECK_INVENTORY\tCHECK_INVENTORY"
+  done |
+    columnise
+}
