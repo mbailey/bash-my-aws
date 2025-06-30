@@ -383,7 +383,7 @@ bucket-inventory-destination() {
 
   local bucket
   for bucket in $buckets; do
-    aws s3api list-bucket-inventory-configurations \
+    local result=$(aws s3api list-bucket-inventory-configurations \
       --bucket "$bucket" \
       --output text \
       --query "
@@ -429,7 +429,7 @@ bucket-inventory-status() {
 
   local bucket
   for bucket in $buckets; do
-    aws s3api list-bucket-inventory-configurations \
+    local result=$(aws s3api list-bucket-inventory-configurations \
       --bucket "$bucket" \
       --output text \
       --query "
