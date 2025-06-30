@@ -2,6 +2,52 @@
 #
 # s3-functions
 
+bucket-object-count() {
+  # Get object count for S3 buckets from CloudWatch metrics
+  #
+  #     $ bucket-object-count my-bucket
+  #     my-bucket  1234567  2025-06-30T00:00:00.000Z
+  #
+  #     $ buckets | bucket-object-count
+  #     bucket-one    45678   2025-06-30T00:00:00.000Z
+  #     bucket-two    123456  2025-06-30T00:00:00.000Z
+  #     bucket-three  NO_DATA NO_DATA
+  #
+  # Note: CloudWatch metrics are updated daily. Shows NO_DATA if metrics unavailable.
+  # For version counts, use bucket-version-count function.
+
+  local bucket_names=$(skim-stdin "$@")
+  [[ -z "$bucket_names" ]] && __bma_usage "bucket-name [bucket-name]" && return 1
+
+  local bucket_name
+  for bucket_name in $bucket_names; do
+    # Get the NumberOfObjects metric from CloudWatch with timestamp
+    local metric_data=$(
+      aws cloudwatch get-metric-statistics \
+        --namespace AWS/S3 \
+        --metric-name NumberOfObjects \
+        --dimensions Name=BucketName,Value="$bucket_name" Name=StorageType,Value=AllStorageTypes \
+        --statistics Average \
+        --start-time $(date -u -d '2 days ago' +%Y-%m-%dT%H:%M:%S) \
+        --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+        --period 86400 \
+        --output text \
+        --query 'Datapoints | sort_by(@, &Timestamp) | [-1].[Average, Timestamp] || [`NO_DATA`, `NO_DATA`]'
+    )
+    
+    # Parse the output
+    local object_count=$(echo "$metric_data" | awk '{print $1}')
+    local timestamp=$(echo "$metric_data" | awk '{print $2}')
+    
+    # Format count as integer if it's a number
+    if [[ "$object_count" != "NO_DATA" ]]; then
+      object_count=${object_count%.*}
+    fi
+    
+    printf "%s\t%s\t%s\n" "$bucket_name" "$object_count" "$timestamp"
+  done | columnise
+}
+
 buckets() {
 
   # List S3 Buckets
@@ -337,7 +383,7 @@ bucket-inventory-destination() {
 
   local bucket
   for bucket in $buckets; do
-    local result=$(aws s3api list-bucket-inventory-configurations \
+    aws s3api list-bucket-inventory-configurations \
       --bucket "$bucket" \
       --output text \
       --query "
@@ -383,7 +429,7 @@ bucket-inventory-status() {
 
   local bucket
   for bucket in $buckets; do
-    local result=$(aws s3api list-bucket-inventory-configurations \
+    aws s3api list-bucket-inventory-configurations \
       --bucket "$bucket" \
       --output text \
       --query "
@@ -403,6 +449,8 @@ bucket-inventory-status() {
     fi
   done |
     columnise
+
+  set +x
 }
 
 bucket-lock-configuration() {
@@ -472,4 +520,156 @@ bucket-lock-stats() {
     echo -e "$bucket\t${total_objects%.*}\tCHECK_INVENTORY\tCHECK_INVENTORY"
   done |
     columnise
+}
+
+bucket-objects() {
+  # List objects in S3 buckets with safety checks for large buckets
+  #
+  # XXX: Non-standard use of --prefix/--max-keys/--no-prompt arguments for bash-my-aws
+  #
+  #     $ bucket-objects my-bucket
+  #     data/file1.txt     2025-06-30T10:00:00.000Z  1024      STANDARD
+  #     data/file2.json    2025-06-29T15:30:00.000Z  2048576   GLACIER
+  #
+  #     $ bucket-objects --prefix data/ my-bucket
+  #     data/file1.txt     2025-06-30T10:00:00.000Z  1024      STANDARD
+  #     data/file2.json    2025-06-29T15:30:00.000Z  2048576   GLACIER
+  #
+  # OPTIONS:
+  #   --prefix PREFIX    List only objects with this prefix
+  #   --max-keys NUMBER  Maximum objects per page (default: 1000)
+  #   --no-prompt        Don't prompt for confirmation on large buckets
+  #
+  # COLUMNS:
+  #   OBJECT_KEY  LAST_MODIFIED  SIZE_BYTES  STORAGE_CLASS
+
+  # Process arguments
+  local prefix=""
+  local max_keys=1000
+  local no_prompt=false
+  local args=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --prefix)
+        prefix="$2"
+        shift 2
+        ;;
+      --max-keys)
+        max_keys="$2"
+        shift 2
+        ;;
+      --no-prompt)
+        no_prompt=true
+        shift
+        ;;
+      *)
+        args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  # Get bucket names
+  local bucket_names=$(skim-stdin "${args[@]}")
+  [[ -z "$bucket_names" ]] && __bma_usage "[--prefix PREFIX] [--max-keys NUMBER] [--no-prompt] bucket-name [bucket-name]" && return 1
+
+  local bucket_name
+  for bucket_name in $bucket_names; do
+    # First check object count if not bypassing prompt
+    if [[ "$no_prompt" != "true" ]]; then
+      echo "Checking object count for $bucket_name..." >&2
+      
+      # Use bucket-object-count function to get the count
+      local count_output=$(bucket-object-count "$bucket_name" | grep -w "^$bucket_name")
+      local object_count=$(echo "$count_output" | cut -f2)
+      
+      # Handle NO_DATA case
+      if [[ "$object_count" == "NO_DATA" ]]; then
+        echo "Warning: Unable to determine object count from CloudWatch metrics" >&2
+        object_count="0"
+      fi
+      
+      # Prompt if more than 1000 objects (and we have a valid count)
+      if [[ "$object_count" =~ ^[0-9]+$ ]] && [[ "$object_count" -gt 1000 ]]; then
+        echo "" >&2
+        echo "WARNING: Bucket '$bucket_name' contains approximately $object_count objects." >&2
+        echo "Listing all objects may take time and incur API costs." >&2
+        [ -t 0 ] || exec </dev/tty # reattach keyboard to STDIN
+        local regex_yes="^[Yy]$"
+        read -p "Continue? (y/N) " -n 1 -r
+        echo >&2
+        if [[ ! $REPLY =~ $regex_yes ]]; then
+          echo "Skipping $bucket_name" >&2
+          continue
+        fi
+      fi
+    fi
+
+    # List objects with pagination
+    local continuation_token=""
+    local page_count=0
+    local total_listed=0
+    
+    while true; do
+      # Build AWS CLI command
+      local aws_cmd=(
+        aws s3api list-objects-v2
+        --bucket "$bucket_name"
+        --max-keys "$max_keys"
+        --output text
+        --query "Contents[].[Key, LastModified, Size, StorageClass || 'STANDARD']"
+      )
+      
+      # Add optional parameters
+      [[ -n "$prefix" ]] && aws_cmd+=(--prefix "$prefix")
+      [[ -n "$continuation_token" ]] && aws_cmd+=(--continuation-token "$continuation_token")
+      
+      # Execute and capture output
+      local output
+      local cmd_result
+      output=$("${aws_cmd[@]}" 2>&1)
+      cmd_result=$?
+      
+      if [[ $cmd_result -ne 0 ]]; then
+        echo "Error listing objects in $bucket_name: $output" >&2
+        break
+      fi
+      
+      # Output the results
+      if [[ -n "$output" ]]; then
+        echo "$output"
+        total_listed=$((total_listed + $(echo "$output" | wc -l)))
+      fi
+      
+      # Check if there are more objects
+      continuation_token=$(aws s3api list-objects-v2 \
+        --bucket "$bucket_name" \
+        ${prefix:+--prefix "$prefix"} \
+        --max-keys "$max_keys" \
+        ${continuation_token:+--continuation-token "$continuation_token"} \
+        --output text \
+        --query "NextContinuationToken" 2>/dev/null)
+      
+      # Break if no more pages
+      [[ -z "$continuation_token" ]] || [[ "$continuation_token" == "None" ]] && break
+      
+      # Increment page count
+      page_count=$((page_count + 1))
+      
+      # Prompt for continuation every 10 pages (10,000 objects by default)
+      if [[ $((page_count % 10)) -eq 0 ]] && [[ "$no_prompt" != "true" ]]; then
+        echo "" >&2
+        echo "Listed $total_listed objects so far..." >&2
+        [ -t 0 ] || exec </dev/tty # reattach keyboard to STDIN
+        local regex_yes="^[Yy]$"
+        read -p "Continue listing? (y/N) " -n 1 -r
+        echo >&2
+        if [[ ! $REPLY =~ $regex_yes ]]; then
+          echo "Stopped listing at $total_listed objects" >&2
+          break
+        fi
+      fi
+    done
+  done | columnise
 }
