@@ -97,7 +97,7 @@ region-each() {
   #     example-ec2-us-west-2       CREATE_COMPLETE  2011-05-23T15:47:44Z  NEVER_UPDATED  NOT_NESTED  #us-west-2
 
   local regions="$(skim-stdin)"
-  [[ -z regions ]] && regions=$(regions)
+  [[ -z $regions ]] && regions=$(regions)
   local region
   for region in ${regions}; do
     (
