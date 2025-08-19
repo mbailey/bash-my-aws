@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+# bedrock-functions
+
+bedrock-model-token-limits() {
+  # List token rate limits for Anthropic models
+  #
+  #     $ bedrock-model-token-limits
+  #     anthropic.claude-v2         100000  500000  10000000
+  #     anthropic.claude-v2:1       100000  500000  10000000
+  #     anthropic.claude-instant-v1 100000  500000  10000000
+  #     anthropic.claude-3-sonnet-20240229-v1:0    200000  1000000  20000000
+  #     anthropic.claude-3-haiku-20240307-v1:0     200000  1000000  20000000
+  #     anthropic.claude-3-opus-20240229-v1:0      200000  1000000  20000000
+
+  local model_ids=$(skim-stdin "$@")
+  local filters=$(__bma_read_filters $@)
+
+  # First list available models
+  aws bedrock list-foundation-models \
+    --output text \
+    --query "modelSummaries[?contains(modelId, 'anthropic')].[modelId]" |\
+  sort |\
+  while read -r model_id; do
+    # Only process models specified in arguments, or all if no arguments
+    if [[ -z "$model_ids" ]] || [[ "$model_ids" == *"$model_id"* ]]; then
+      # Get model details
+      aws bedrock get-foundation-model \
+        --model-id "$model_id" \
+        --output text \
+        --query "[
+          modelId,
+          inferenceTypesSupported[?inferenceType=='ON_DEMAND'].inferenceSpecificThrottling[0].throttlingValues[0].[rateLimit.requestsPerSecond, rateLimit.tokensPerMinute, rateLimit.tokenBucketCapacity] | [0][0][0],
+          inferenceTypesSupported[?inferenceType=='ON_DEMAND'].inferenceSpecificThrottling[0].throttlingValues[0].[rateLimit.requestsPerSecond, rateLimit.tokensPerMinute, rateLimit.tokenBucketCapacity] | [0][0][1],
+          inferenceTypesSupported[?inferenceType=='ON_DEMAND'].inferenceSpecificThrottling[0].throttlingValues[0].[rateLimit.requestsPerSecond, rateLimit.tokensPerMinute, rateLimit.tokenBucketCapacity] | [0][0][2]
+        ]"
+    fi
+  done |\
+  grep -E -- "$filters" |\
+  columnise
+
+}
+
+bedrock-models() {
+  # List available foundation models in AWS Bedrock
+  #
+  #     $ bedrock-models
+  #     amazon.titan-text-lite-v1       ACTIVE
+  #     anthropic.claude-instant-v1     ACTIVE
+  #     anthropic.claude-v2             ACTIVE
+
+  local model_ids=$(skim-stdin "$@")
+  local filters=$(__bma_read_filters $@)
+
+  aws bedrock list-foundation-models \
+    --output text \
+    --query "modelSummaries[].[
+      modelId,
+      modelLifecycle.status
+    ]" |\
+  grep -E -- "$filters" |\
+  sort |\
+  columnise
+}
