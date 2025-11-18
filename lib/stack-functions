@@ -417,10 +417,10 @@ stack-resources() {
   local stack
   for stack in $stacks; do
     stack=$(_bma_stack_name_arg "$stack")
-    aws cloudformation describe-stack-resources                       \
+    aws cloudformation list-stack-resources                           \
       --stack-name $(_bma_stack_name_arg "$stack")                    \
       --output "${BMA_OUTPUT_AWS:-text}" \
-      --query "StackResources[].{
+      --query "StackResourceSummaries[].{
                PhysicalResourceId: PhysicalResourceId,
                ResourceType: ResourceType,
                ResourceStatus: ResourceStatus,
