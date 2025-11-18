@@ -258,9 +258,19 @@ stack-update() {
   local capabilities_value=$(_bma_stack_capabilities $stack)
   [[ -z "${capabilities_value}" ]] || capabilities="--capabilities ${capabilities_value}"
 
+  local template_size=$(cat $template | wc -c)
+  if [ ${template_size} -gt 51200 ]; then
+    local filename="$(date -u "+%Y-%m-%dT%s")-$(basename $template)"
+    echo "  template too large ... uploading to S3 ..."
+    aws s3 cp --quiet $template s3://$CFN_BUCKET/$filename
+    local template_path="--template-url https://${CFN_BUCKET}.s3.amazonaws.com/${filename}"
+  else
+    local template_path="--template-body file://$template"
+  fi
+
   if aws cloudformation update-stack \
     --stack-name $stack              \
-    --template-body file://$template \
+    $template_path                   \
     $parameters                      \
     $capabilities                    \
     --output text; then
