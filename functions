@@ -1,26 +1,6 @@
 # DO NOT MANUALLY MODIFY THIS FILE.
 # Use 'scripts/build' to regenerate if required.
 
-__bma-using-aws-cli-v1
-__bma_error
-__bma_read_filters
-__bma_read_filters-az
-__bma_read_inputs
-__bma_read_stdin
-__bma_usage
-_bma_derive_params_from_stack_and_template
-_bma_derive_params_from_template
-_bma_derive_stack_from_params
-_bma_derive_stack_from_template
-_bma_derive_template_from_params
-_bma_derive_template_from_stack
-_bma_stack_args
-_bma_stack_capabilities
-_bma_stack_diff_params
-_bma_stack_diff_template
-_bma_stack_name_arg
-_bma_stack_params_arg
-_bma_stack_template_arg
 ad-app
 ad-app-owners
 ad-apps

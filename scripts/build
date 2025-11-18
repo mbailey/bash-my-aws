@@ -14,7 +14,7 @@ funcs_before_bma=$(compgen -A function)
 for f in $project_root/lib/*-functions; do source "$f"; done
 
 # all function after loading BMA functions
-funcs_after_bma=$(compgen -A function)
+funcs_after_bma=$(compgen -A function | command grep -vE '^(_|__)bma')
 
 # Generate the functions file
 
