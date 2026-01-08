@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# elasticache-functions
+#
+# 
+
+
+elasticaches() {
+
+  # List elasticache thingies
+  #
+  #     $ target-groups
+  #     bash-my-aws-nlb-tg  TCP   22   vpc-04636ebe5573f6f65  instance  bash-my-aws-nlb
+  #     bash-my-aws-alb-tg  HTTP  443  vpc-04636ebe5573f6f65  instance  bash-my-aws-alb
+
+  local cache_names=$(skim-stdin)
+  local filters=$(__bma_read_filters $@)
+
+  aws elasticache describe-cache-clusters   \
+    ${cache_names/#/'--cache-cluster-id '}         \
+    --output text                    \
+    --query "
+      CacheClusters[][
+        CacheClusterId,
+        CacheNodeType,
+        Engine,
+        EngineVersion,
+        CacheClusterStatus
+      ]" |
+  grep -E -- "$filters" |
+  LC_ALL=C sort -b |
+  column -s$'\t' -t
+}
+
+
+elasticache-replication-groups() {
+
+  # 
+  # Accepts Target Group names on stdin or as arguments
+  #
+  #     $ target-group-targets bash-my-aws-nlb-tg
+  #     i-4e15ece1de1a3f869  443  healthy    bash-my-aws-nlb-tg
+  #     i-89cefa9403373d7a5  443  unhealthy  bash-my-aws-nlb-tg
+
+  local ec_names=$(skim-stdin "$@")
+
+  for ec_name in $ec_names; do
+    local tg_arn=$(aws describe-replication-groups \
+      --names "$ec_name"                   \
+      --output text                        \
+      --query "
+        ReplicationGroups[][
+          ReplicationGroupId
+        ]
+      ")
+  done | column -s$'\t' -t
+}

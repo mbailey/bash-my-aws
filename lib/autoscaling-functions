@@ -1,0 +1,44 @@
+#!/bin/bash
+#
+# autoscaling-functions
+##
+# show the current autoscale settings
+# namespace          | implemented
+#   ecs              |  yes
+#   elasticmapreduce |  no
+#   ec2              |  maybe
+#   appstream        |  maybe
+#   dynamodb         |  no
+#   rds              |  maybe
+#   sagemaker        |  no
+#   custom-resource  |  no
+#   comprehend       |  no
+#   lambda           |  no
+#   cassandra        |  no
+#   kafka            |  no
+#   elasticache      |  no
+#   neptune          |  no
+
+### this has been moved to the ecs functions.  was that a good idea?
+##scaling-ecs() {
+  # List autoscaling actions
+  # filter by environment (eg test1) or namespace (eg ecs)
+  # if you pass an argument, it'll filter for clusters whose ARN contains your text
+  #
+  #   $ scaling-ecs 'test.*down'     # list the scale-down times of all our test environments
+#       test1-ecs-admin-scale-down-overnight   cron(0 0 9 ? * MON-FRI *)  0  0
+#       test1-ecs-public-scale-down-overnight  cron(0 0 9 ? * MON-FRI *)  0  0
+#       test2-ecs-admin-scale-down-overnight   cron(0 0 9 ? * MON-FRI *)  0  0
+#       test2-ecs-public-scale-down-overnight  cron(0 0 9 ? * MON-FRI *)  0  0
+#       test3-ecs-admin-scale-down-overnight   cron(0 0 9 ? * MON-FRI *)  0  0
+#       test3-ecs-public-scale-down-overnight  cron(0 0 9 ? * MON-FRI *)  0  0
+
+##  local filters=$(__bma_read_filters $@) # Filter output by arguments (optional)
+##  aws application-autoscaling describe-scheduled-actions \
+##    --service-namespace ecs \
+##    --query "ScheduledActions[].[ScheduledActionName,Schedule,ScalableTargetAction.MinCapacity,ScalableTargetAction.MaxCapacity]" \
+##    --output text       |
+##    grep -E -- "$filters" |
+##    LC_ALL=C sort -b -k 2|
+##    columnise
+##}

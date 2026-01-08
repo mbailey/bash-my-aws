@@ -1,0 +1,64 @@
+#!/bin/bash
+# shellcheck disable=SC2046
+# shellcheck disable=SC2155
+#
+# codedeploy-functions
+
+deployment() {
+
+  # List deployments
+
+  local deploymentgroup_names=$(skim-stdin)
+  local filters=$(__bma_read_filters $@)
+
+# aws deploy list-applications
+# aws deploy list-deployment-groups --application-name 'tenders-web-dev2'
+# list-deployments (limit to last 24 hours or most recent 5??) :
+# aws deploy list-deployments --deployment-group-name gc3-test2 --application-name grants-web-gc3-test2 --include-only-statuses "Succeeded" --query 'deployments[0]'
+# describe-deployment : aws deploy get-deployment --deployment-id d-MLWOBA1PK
+## deployment-status should return the status of the last deployment to this group
+# deployment-status : aws deploy get-deployment --deployment-id d-49ASRV1VL  --query 'deploymentInfo.status'
+  aws deploy list-deployments              \
+    ${asg_names/#/'--auto-scaling-group-names '}            \
+    --output text                                           \
+    --query "AutoScalingGroups[].[
+      AutoScalingGroupName,
+      join(',', [Tags[?Key=='Name'].Value || 'NO_NAME'][]),
+      CreatedTime,
+      join(',' sort(AvailabilityZones))
+    ]"                  |
+  grep -E -- "$filters" |
+  sort -k 3             |
+  column -s$'\t' -t
+}
+
+
+deployments() {
+
+  # List all deployment IDs for a deployment group (not useful for the user, only internal)
+  ## ?? if no deployment group, could we list all deployments for this application, with their groups and statuses?
+  local application_name=$(skim-stdin "$@")
+  local deployment_group_name=$(skim-stdin "$@")
+  [[ -z $application_name ]] && __bma_usage "application_name [application_name]" && return 1
+
+  # shellcheck disable=SC2086
+  aws deploy list-deployments \
+    --application-name $application_name \
+    --deployment-group-name $deployment_group_name \
+    --output text                              \
+  column -s$'\t' -t
+}
+
+deployment-groups() {
+
+  # List all deployment groups for an application
+
+  local application_name=$(skim-stdin "$@")
+  [[ -z $application_name ]] && __bma_usage "application_name [application_name]" && return 1
+
+  # shellcheck disable=SC2086
+  aws deploy list-deployment-groups \
+    --application-name $application_name \
+    --output text                              \
+    --query "deploymentGroups[*]"
+}

@@ -42,25 +42,80 @@ hosted-zone-ns-records() {
   #     bash-my-aws.org. 300 IN NS	ns-1464.awsdns-55.org.
 
   local inputs=$(skim-stdin "$@")
-  local hosted_zone_id=$(echo "$inputs" | awk '{print $1}')
-  [[ -z "$hosted_zone_id" ]] && __bma_usage "hosted-zone-id" && return 1
+  local hosted_zone_ids=$(echo "$inputs")
+  [[ -z "$hosted_zone_ids" ]] && __bma_usage "hosted-zone-id" && return 1
 
   local hosted_zone_name
-  hosted_zone_name=$(
-    aws route53 list-resource-record-sets \
-      --hosted-zone-id "$hosted_zone_id" \
-      --query "ResourceRecordSets[?Type=='NS'].Name" \
-      --output text
-  )
+
+  for hosted_zone_id in $hosted_zone_ids; do
+    hosted_zone_name=$(
+      aws route53 list-resource-record-sets            \
+        --hosted-zone-id "$hosted_zone_id"             \
+        --query "ResourceRecordSets[?Type=='NS'].Name" \
+        --output text
+    )
+
+    aws route53 list-resource-record-sets                   \
+      --hosted-zone-id "$hosted_zone_id"                    \
+      --output text                                         \
+      --query "
+        ResourceRecordSets[?Type=='NS'].ResourceRecords[].[
+          '$hosted_zone_name 300 IN NS',
+          Value
+        ]"
+  done
+}
+
+hosted-zone-records(){
+
+  # List Records in a Route53 Hosted Zone
+  # NOTE: AWS alias records are shown with a fake TTL of 86400.
+  #
+  #     $ hosted-zones bash-my-aws.org
+  #     /hostedzone/ZJ6ZCG2UD6OKX  5  NotPrivateZone  bash-my-aws.org.
+  #
+  #     $ hosted-zones bash-my-aws.org | hosted-zone-records
+  #     bash-my-aws.org.  900 SOA ns-1549.awsdns-01.co.uk. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400
+  #     bash-my-aws.org.  300 NS  ns-1464.awsdns-55.org.
+  #     bash-my-aws.org.  300 A 185.199.108.153
+  #     bash-my-aws.org.  300 A 185.199.109.153
+  #     bash-my-aws.org.  300 TXT "google-site-verification=RbKejqu95y4Q78BkWnjaiM0rl6SYugtTdVLexK35b2k"
+  #     lb.bash-my-aws.org. 86400 ALIAS dualstack.lb-bmaorg-12345.us-east-1.elb.amazonaws.com
+
+  local hosted_zone_id="$(__bma_read_inputs $@)"
+  [[ -z "$hosted_zone_id" ]] && __bma_usage "hosted-zone-id" && return 1
 
   aws route53 list-resource-record-sets \
-    --hosted-zone-id "$hosted_zone_id" \
-    --output text \
-    --query "
-      ResourceRecordSets[?Type=='NS'].ResourceRecords[].[
-        '$hosted_zone_name 300 IN NS',
-        Value
-      ]"
+    --hosted-zone-id "$hosted_zone_id"  \
+    --output json                       |
+  jq --raw-output '.ResourceRecordSets[] |
+    (select(.ResourceRecords) |
+      "\(.Name) \t\(.TTL) \t\(.Type) \t\(.ResourceRecords[].Value)\n"),
+    (select(.AliasTarget) |
+      "\(.Name) \t86400 \tALIAS \t\(.AliasTarget.DNSName)\n")'
+}
+
+hosted-zone-a-records(){
+
+  # Generate NS records for delegating domain to AWS
+  #
+  #     $ hosted-zone-a-records bash-my-aws.org
+  #
+  #     $ hosted-zones | hosted-zone-a-records
+
+  local inputs=$(skim-stdin "$@")
+  local hosted_zone_ids=$(echo "$inputs")
+  [[ -z "$hosted_zone_ids" ]] && __bma_usage "hosted-zone-id" && return 1
+
+  local hosted_zone_name
+  for hosted_zone_id in $hosted_zone_ids; do
+
+    aws route53 list-resource-record-sets                   \
+      --hosted-zone-id "$hosted_zone_id"                    \
+      --output text                                         \
+      --query "ResourceRecordSets[?Type=='A'].[Name,AliasTarget.DNSName]" |
+    columnise
+  done
 }
 
 hosted-zone-delete() {

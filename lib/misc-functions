@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+# miscellaneous functions that don't belong anywhere else
+
+
+  # Handy function to columnise output
+  #
+  # Leaving the command itself in functions (for now) to be explicit but
+  # I'm finding it handy to have this function at the CLI for formatting
+  # output from commands run in a loop.
+  #
+  # Looped commands (such as those with multiple resources piped in) do
+  # not delay output by sending the aggregate through `column`.
+
+columnise() {
+
+  if [[ $BMA_COLUMNISE_ONLY_WHEN_TERMINAL_PRESENT == 'true' ]] && ! [[ -t 1 ]]; then
+    cat
+  else
+    column -t -s $'\t'
+  fi
+}
+
+trim_date() {
+  sed 's/\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T[0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}\)\S*/\1/g'
+}

@@ -204,7 +204,7 @@ Create a CloudFormation Stack
 to take advantage of shorter commands*
 
     USAGE: stack-create stack [template-file] [parameters-file]             \
-                [--capabilities=OPTIONAL_VALUE] [--role-arn=OPTIONAL_VALUE]
+                [CAPABILITY_1 CAPABILITY_2] [--role-arn=OPTIONAL_VALUE]
 
     $ stack-create params/asg-params-prod.json
     Resolved arguments: asg-prod ./asg.yml params/asg-params-prod.json
@@ -408,7 +408,7 @@ Show all events for CF stack until update completes or fails.
 
 ### stack-template
 
-Return template of a stack
+Return template of each stack
 
 
 ### stack-template-changeset-latest
@@ -435,6 +435,21 @@ List outputs of a stack
 ### stack-validate
 
 Validate a stack template
+
+
+### stack-detect-drift
+
+Detect drift for provided stacks; and print coloured diff
+
+
+### stack-describe-drift
+
+List stack-tags applied to a stack
+
+
+### stack-diff-drift
+
+List stack-tags applied to a stack
 
 
 ### stack-diff
@@ -571,6 +586,13 @@ List EC2 Instances
     $ instances postgres
     i-89cefa9403373d7a5  ami-123456789012  t3.nano  running  postgres1  2019-12-10T08:17:20.000Z  ap-southeast-2a  None
     i-806d8f1592e2a2efd  ami-123456789012  t3.nano  running  postgres2  2019-12-10T08:17:22.000Z  ap-southeast-2a  None
+
+
+### instance-id
+
+Just return the instance ID of whatever was passed in (so you can run a for loop, for instance)
+
+    USAGE: instances [grep] | instance-id
 
 
 ### instance-asg
@@ -974,6 +996,18 @@ List CloudFormation stack for asg(s)
 ### asg-scaling-activities
 
 List scaling activities for Autoscaling Group(s)
+
+
+## autoscaling-commands
+
+
+### ##scaling-ecs
+
+List autoscaling actions
+filter by environment (eg test1) or namespace (eg ecs)
+if you pass an argument, it'll filter for clusters whose ARN contains your text
+
+  $ scaling-ecs 'test.*down'     # list the scale-down times of all our test environments
 
 
 ## azure-commands
@@ -1510,6 +1544,25 @@ List Cloudwatch Alarms
 
 
 
+## codedeploy-commands
+
+
+### deployment
+
+List deployments
+
+
+### deployments
+
+List all deployment IDs for a deployment group (not useful for the user, only internal)
+# ?? if no deployment group, could we list all deployments for this application, with their groups and statuses?
+
+
+### deployment-groups
+
+List all deployment groups for an application
+
+
 ## domain-commands
 
 
@@ -1550,6 +1603,196 @@ List ECR Repositories
 ### ecr-repository-images
 
 List images for ECR Repositories
+
+
+## ecs-commands
+
+
+### ecs-clusters
+
+List ECS clusters
+output includes clusterName,status,activeServicesCount,runningTasksCount,pendingTasksCount
+if you pass an argument, it'll filter for clusters whose ARN contains your text
+
+  $ ecs-clusters test
+  test-octopus-ecs-cluster  ACTIVE  1  1  0
+  test1-ecs-cluster        ACTIVE  3  1  0
+  test3-ecs-cluster        ACTIVE  3  1  0
+  test2-ecs-cluster        ACTIVE  3  3  0
+
+
+### ecs-services
+
+List ECS services
+output includes serviceName,status,desiredCount,runningCount,pendingCount,createdAt
+
+gets all clusters if no filter passed in
+if you do pass a filter:
+1. if your filter is the name of one of your clusters, it will list the services in that cluster (eg ecs-clusters test1 | ecs-services)
+2. if your filter is not a cluster name, it will list the services in all clusters whose names match your filter (ie it filters on cluster name not service name)
+3. if you do not pass a filter, it will list all services in all clusters
+
+  $ ecs-clusters test1|ecs-services
+  test1-ecs-admin-7URaUr0YGJHi        ACTIVE  0  0  0  2023-09-13T17:16:48.198000+10:00
+  test1-ecs-public-wEaTAqGXqbpq      ACTIVE  0  0  0  2023-09-13T16:54:54.162000+10:00
+  test1-ecs-hangfire-YNIo1hlx8rjn  ACTIVE  1  1  0  2023-09-13T16:39:06.218000+10:00
+
+
+### ecs-tasks
+
+List ECS tasks
+output includes taskDefinitionArn, createdAt, cpu, memory
+
+gets all tasks if no filter passed in
+if you do pass a filter, it filters on the task name.  All clusters are included (I haven't worked out a way of passing a cluster name AND a filter)
+
+  $ ecs-tasks test2
+  arn:aws:ecs:ap-southeast-2:xxxxxxxxxxxx:task-definition/test2-public:18    2023-09-19T17:51:56.418000+10:00  2048  4096
+  arn:aws:ecs:ap-southeast-2:xxxxxxxxxxxx:task-definition/test2-admin:20     2023-08-29T10:03:36.956000+10:00  2048  4096
+  arn:aws:ecs:ap-southeast-2:xxxxxxxxxxxx:task-definition/test2-hangfire:22  2023-09-19T17:11:06.622000+10:00  1024  2048
+
+
+### ecs-scaling-activities
+
+List autoscaling activities - the actual scaling events that have happened
+eg
+ecs-scaling www
+2023-11-22T06:24:50.937000+11:00        www-ecs-public-ServicePublic-OuN3rXBLvmx3-AlarmLow-64de4512-d901-4b26-a6a2-184bb1e90bc6 in state ALARM triggered policy www-ecs-public-target-tracking-mem70     Successfully set desired count to 2. Change successfully fulfilled by ecs.
+2023-11-22T05:25:48.611000+11:00        www-ecs-public-ServicePublic-OuN3rXBLvmx3-AlarmHigh-6408c172-647e-4c0e-aac9-a800cd83317d in state ALARM triggered policy www-ecs-public-target-tracking-mem70    Successfully set desired count to 3. Change successfully fulfilled by ecs.
+
+
+### ecs-scaling-actions
+
+List autoscaling actions - cron-based scheduled scaling
+filter by environment (eg test1) or namespace (eg ecs)
+if you pass an argument, it'll filter for clusters whose ARN contains your text
+
+  $ scaling-ecs 'test.*down'     # list the scale-down times of all our test environments
+
+
+## ecs-commands~
+
+
+### ecs-clusters
+
+List ECS clusters
+output includes clusterName,status,activeServicesCount,runningTasksCount,pendingTasksCount
+if you pass an argument, it'll filter for clusters whose ARN contains your text
+
+  $ ecs-clusters test
+  test-octopus-ecs-cluster  ACTIVE  1  1  0
+  test1-ecs-cluster        ACTIVE  3  1  0
+  test3-ecs-cluster        ACTIVE  3  1  0
+  test2-ecs-cluster        ACTIVE  3  3  0
+
+
+### ecs-services
+
+List ECS services
+output includes serviceName,status,desiredCount,runningCount,pendingCount,createdAt
+
+gets all clusters if no filter passed in
+if you do pass a filter:
+1. if your filter is the name of one of your clusters, it will list the services in that cluster (eg ecs-clusters test1 | ecs-services)
+2. if your filter is not a cluster name, it will list the services in all clusters whose names match your filter (ie it filters on cluster name not service name)
+3. if you do not pass a filter, it will list all services in all clusters
+
+  $ ecs-clusters test1|ecs-services
+  test1-ecs-admin-7URaUr0YGJHi        ACTIVE  0  0  0  2023-09-13T17:16:48.198000+10:00
+  test1-ecs-public-wEaTAqGXqbpq      ACTIVE  0  0  0  2023-09-13T16:54:54.162000+10:00
+  test1-ecs-hangfire-YNIo1hlx8rjn  ACTIVE  1  1  0  2023-09-13T16:39:06.218000+10:00
+
+
+### ecs-tasks
+
+List ECS tasks
+output includes name:version, createdAt, cpu, memory
+
+gets all tasks if no filter passed in
+if you do pass a filter, it filters on the task name.  All clusters are included (I haven't worked out a way of passing a cluster name AND a filter)
+
+  $ ecs-tasks test2
+  arn:aws:ecs:ap-southeast-2:xxxxxxxxxxxx:task-definition/test2-public:18    2023-09-19T17:51:56.418000+10:00  2048  4096
+  arn:aws:ecs:ap-southeast-2:xxxxxxxxxxxx:task-definition/test2-admin:20     2023-08-29T10:03:36.956000+10:00  2048  4096
+  arn:aws:ecs:ap-southeast-2:xxxxxxxxxxxx:task-definition/test2-hangfire:22  2023-09-19T17:11:06.622000+10:00  1024  2048
+
+
+### ecs-task-details
+
+List ECS tasks
+output includes name:version, taskDefinitionArn, status, createdAt, cpu, memory
+
+gets all tasks if no filter passed in
+if you do pass a filter, it filters on the task name.  All clusters are included (I haven't worked out a way of passing a cluster name AND a filter)
+
+  $ ecs-tasks test2
+  arn:aws:ecs:ap-southeast-2:xxxxxxxxxxxx:task-definition/test2-public:18    2023-09-19T17:51:56.418000+10:00  2048  4096
+  5d6a2107-5723-44ac-8cdc-2c0dbeb8f69e       10.156.46.146
+  arn:aws:ecs:ap-southeast-2:xxxxxxxxxxxx:task-definition/test2-admin:20     2023-08-29T10:03:36.956000+10:00  2048  4096
+  934e4ca3-3d11-42fb-aadf-483e88f59d7c       10.156.30.66
+  arn:aws:ecs:ap-southeast-2:xxxxxxxxxxxx:task-definition/test2-hangfire:22  2023-09-19T17:11:06.622000+10:00  1024  2048
+  6a37c83e-dc85-473c-8a79-7023f85bd052       10.156.54.40
+
+
+### ecs-scaling-activities
+
+List autoscaling activities - the actual scaling events that have happened
+eg
+ecs-scaling www
+2023-11-22T06:24:50.937000+11:00        www-ecs-public-ServicePublic-OuN3rXBLvmx3-AlarmLow-64de4512-d901-4b26-a6a2-184bb1e90bc6 in state ALARM triggered policy www-ecs-public-target-tracking-mem70     Successfully set desired count to 2. Change successfully fulfilled by ecs.
+2023-11-22T05:25:48.611000+11:00        www-ecs-public-ServicePublic-OuN3rXBLvmx3-AlarmHigh-6408c172-647e-4c0e-aac9-a800cd83317d in state ALARM triggered policy www-ecs-public-target-tracking-mem70    Successfully set desired count to 3. Change successfully fulfilled by ecs.
+
+
+### ecs-scaling-actions
+
+List autoscaling actions - cron-based scheduled scaling
+filter by environment (eg test1) or namespace (eg ecs)
+if you pass an argument, it'll filter for clusters whose ARN contains your text
+
+  $ scaling-ecs 'test.*down'     # list the scale-down times of all our test environments
+
+
+## elasticache-commands
+
+
+### elasticaches
+
+List elasticache thingies (code borrowed from target-groups)
+
+    $ target-groups
+    bash-my-aws-nlb-tg  TCP   22   vpc-04636ebe5573f6f65  instance  bash-my-aws-nlb
+    bash-my-aws-alb-tg  HTTP  443  vpc-04636ebe5573f6f65  instance  bash-my-aws-alb
+
+
+### elasticache-replication-groups
+
+
+Accepts a string to filter on
+This is not very useful without column headings.
+Most of the things you want to know about a replication group are boolean
+eg AutomaticFailover, MultiAZClusterEnabled, AtRestEncryptionEnabled etc
+
+
+## elasticache-commands-littlelaptop
+
+
+### elasticaches
+
+List elasticache thingies
+
+    $ target-groups
+    bash-my-aws-nlb-tg  TCP   22   vpc-04636ebe5573f6f65  instance  bash-my-aws-nlb
+    bash-my-aws-alb-tg  HTTP  443  vpc-04636ebe5573f6f65  instance  bash-my-aws-alb
+
+
+### elasticache-replication-groups
+
+
+Accepts Target Group names on stdin or as arguments
+
+    $ target-group-targets bash-my-aws-nlb-tg
+    i-4e15ece1de1a3f869  443  healthy    bash-my-aws-nlb-tg
+    i-89cefa9403373d7a5  443  unhealthy  bash-my-aws-nlb-tg
 
 
 ## elb-commands
@@ -1642,6 +1885,17 @@ Accepts Load Balancer names on STDIN and converts to Network Load Balancer names
     $ elbv2s
     bash-my-aws      network      internet-facing  active        2020-01-04T11:18:49.733Z
     bash-my-aws-alb  application  internet-facing  provisioning  2020-01-04T11:29:45.030Z
+
+
+### elbv2-arn
+
+List DNS Names of elbv2(s)
+
+    USAGE: elbv2-dnsname load-balancer [load-balancer]
+
+    $ elbv2s | elbv2-dnsname
+    bash-my-aws      bash-my-aws-c23c598688520e51.elb.ap-southeast-2.amazonaws.com
+    bash-my-aws-alb  bash-my-aws-alb-2036199590.ap-southeast-2.elb.amazonaws.com
 
 
 ### elbv2-dnsname
@@ -1989,6 +2243,21 @@ List CloudWatch Log Groups
     /aws/lambda/walk    1576567300172  0   11794
 
 
+### log-group-delete
+
+Delete CloudWatch Log Group
+
+    $ log-group-delete /aws/lambda/stars
+    You are about to delete the following log groups?
+    /aws/lambda/stars
+    Are you sure? [y/N] y
+    Deleting: /aws/lambda/stars
+    Deleted: /aws/lambda/stars
+
+    You can also pipe the log group names to this command
+    $ log-groups | log-group-delete
+
+
 ## rds-commands
 
 
@@ -2030,6 +2299,32 @@ Generate NS records for delegating domain to AWS
     bash-my-aws.org. 300 IN NS	ns-1549.awsdns-01.co.uk.
     bash-my-aws.org. 300 IN NS	ns-362.awsdns-45.com.
     bash-my-aws.org. 300 IN NS	ns-1464.awsdns-55.org.
+
+
+### hosted-zone-records
+
+List Records in a Route53 Hosted Zone
+NOTE: AWS alias records are shown with a fake TTL of 86400.
+
+    $ hosted-zones bash-my-aws.org
+    /hostedzone/ZJ6ZCG2UD6OKX  5  NotPrivateZone  bash-my-aws.org.
+
+    $ hosted-zones bash-my-aws.org | hosted-zone-records
+    bash-my-aws.org.  900 SOA ns-1549.awsdns-01.co.uk. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400
+    bash-my-aws.org.  300 NS  ns-1464.awsdns-55.org.
+    bash-my-aws.org.  300 A 185.199.108.153
+    bash-my-aws.org.  300 A 185.199.109.153
+    bash-my-aws.org.  300 TXT "google-site-verification=RbKejqu95y4Q78BkWnjaiM0rl6SYugtTdVLexK35b2k"
+    lb.bash-my-aws.org. 86400 ALIAS dualstack.lb-bmaorg-12345.us-east-1.elb.amazonaws.com
+
+
+### hosted-zone-a-records
+
+Generate NS records for delegating domain to AWS
+
+    $ hosted-zone-a-records bash-my-aws.org
+
+    $ hosted-zones | hosted-zone-a-records
 
 
 ### hosted-zone-delete
@@ -2338,6 +2633,222 @@ Print SSM Parameter Value
        "logs_collected": {
          "files": {
    <snip>
+
+
+### instance-ssm-platform-type
+
+Show platform type (OS) for instance
+
+    USAGE: instance-ssm-platform-type instance-id [instance-id]
+
+    $ instances | instance-ssm-platform-type
+    i-0c1d2e3f4a567890b     None
+    i-0d1c2b3a4e5f6789c     Linux
+    i-0e1f2d3c4b5a6789d     Linux
+    i-0f1e2d3c4b5a6789e     None
+    i-0a9f8e7d6c5b4a312     None
+    i-01b2a3c4d5e6f7893     Windows
+
+
+## ssm-commands~
+
+
+### ssm-instances
+
+List Instances known to SSM
+
+   USAGE: ssm-instances [filter]
+
+   $ ssm-instances
+   i-00a123b456d789012  Online  Amazon Linux                              2           192.168.1.10    server001.example.com
+   i-01b234c567e890123  Online  Microsoft Windows Server 2019 Datacenter  10.0.17763  192.168.1.20    winserver002.example.com
+   i-02c345d678f901234  Online  Ubuntu                                    20.04       192.168.1.30    ubuntu003.example.com
+   i-03d456e789a012345  Online  Ubuntu                                    20.04       192.168.1.40    ubuntu004.example.com
+   i-04e567f89b1234567  Online  Amazon Linux                              2           192.168.1.50    server005.example.com
+   *Optionally provide a filter string for a `| grep` effect with tighter columisation:*
+
+   $ ssm-instances Windows
+   i-00a123b456d789012 Online  Microsoft Windows Server 2019 Datacenter  68.0.11111  192.168.1.10    server001.example.com
+   i-01b234c567e890123 Online  Microsoft Windows Server 2022 Datacenter  68.0.11112  192.168.1.20    winserver002.example.com
+
+
+### ssm-send-command
+
+Run a command locally on EC2 instance(s) running Linux
+
+    USAGE: ssm-send-command COMMAND instance-id [instance-id]
+
+    $ ssm-send-command 'date +%F' i-0fict1234abcd
+    Command ID: 12345abc-de67-f890-gh12-34ij56kl789m
+    Waiting for command to complete...
+    i-0fict1234abcd  2023-12-01
+
+    $ ssm-instances | grep Linux | ssm-send-command 'date +%F'
+    Command ID: 98b7c6d2-e3f4-11ac-8d20-47a56db09c8f
+    Waiting for command to complete...
+    i-0fake1234a567bcd  2023-12-01
+    i-0fake2345b678cde  2023-12-01
+    i-0fake3456c789def  2023-11-30
+    i-0fake4567d890efa  2023-11-30
+    i-0fake5678e901fgh  2023-12-01
+    i-0fake6789f012ghi  2023-12-01
+
+    See also: ssm-send-command-windows
+Escape double quotes in command
+Send command
+
+
+### ssm-send-command-windows
+
+Run a command locally on EC2 instance(s) running Windows
+
+    USAGE: ssm-send-command-windows COMMAND instance-id [instance-id]
+
+    $ ssm-send-command 'Get-Hotfix' i-0fict1234abcd
+    Command ID: 12345abc-de67-f890-gh12-34ij56kl789m
+    Waiting for command to complete...
+    i-0fict1234abcd  2023-12-01
+
+    $ ssm-instances Windows | ssm-send-command-windows Get-Hotfix
+    Command ID: a0eeeddc-2edf-42bc-b0c7-122f5bc50956
+    Waiting for command to complete...
+    i-0fake1234abcd
+       Source        Description      HotFixID      InstalledBy          InstalledOn
+       ------        -----------      --------      -----------          -----------
+       FAKEAPP01234  Update           KB1234567     NT AUTHORITY\SYSTEM  10/11/2023 12:00:00 AM
+       FAKEAPP01234  Update           KB8901234     NT AUTHORITY\SYSTEM  12/12/2018 12:00:00 AM
+       FAKEAPP01234  Security Update  KB5678901     NT AUTHORITY\SYSTEM  12/12/2018 12:00:00 AM
+       FAKEAPP01234  Update           KB2345678     NT AUTHORITY\SYSTEM  1/9/2019 12:00:00 AM
+       FAKEAPP01234  Update           KB3456789     NT AUTHORITY\SYSTEM  3/11/2021 12:00:00 AM
+       FAKEAPP01234  Security Update  KB4567890     NT AUTHORITY\SYSTEM  4/21/2019 12:00:00 AM
+       FAKEAPP01234  Security Update  KB5678901     NT AUTHORITY\SYSTEM  5/15/2019 12:00:00 AM
+       FAKEAPP01234  Security Update  KB6789012     NT AUTHORITY\SYSTEM  6/12/2019 12:00:00 AM
+    ---Output truncated---
+    i-0fake1234abcd
+       Source        Description      HotFixID      InstalledBy          InstalledOn
+       ------        -----------      --------      -----------          -----------
+       FAKEAPP01234  Update           KB1234567     NT AUTHORITY\SYSTEM  10/11/2023 12:00:00 AM
+       FAKEAPP01234  Update           KB8901234     NT AUTHORITY\SYSTEM  12/12/2018 12:00:00 AM
+       FAKEAPP01234  Security Update  KB5678901     NT AUTHORITY\SYSTEM  12/12/2018 12:00:00 AM
+
+    See also: ssm-send-command-windows
+
+
+### ssm-automation-executions
+
+List recent SSM Automation Executions
+USAGE: ssm-automation-executions [filter]
+
+    $ ssm-automation-executions
+    1234abcd-ef56-7890-gh12-ijk3456lmnop  UpdateAndSecureNodes    None                 Failed   2023-07-20T09:00:00.000000+00:00  None
+    5678efgh-ijkl-9012-mnop-qrstuvwx3456  UpdateAndSecureNodes    i-0a1b2c3d4e5f67890  Failed   2023-07-20T09:00:10.000000+00:00  None
+    90abijkl-mnop-4567-qrst-uvwxyza12345  UpdateAndSecureNodes    i-1b2c3d4e5f6g78901  Failed   2023-07-20T09:00:20.000000+00:00  None
+    cdefmnop-qrst-8910-uvwx-yzab1234cdef  UpdateAndSecureNodes    i-2c3d4e5f6g7h89012  Failed   2023-07-20T09:00:30.000000+00:00  None
+    ghijqrst-uvwx-2345-yzab-abcd5678efgh  UpdateAndSecureNodes    i-3d4e5f6g7h8i90123  Failed   2023-07-20T09:00:40.000000+00:00  None
+
+
+### ssm-automation-execution-failures
+
+
+
+### ssm-automation-step-executions
+
+Show step-by-step details for an SSM Automation Execution
+
+    USAGE: automation-execution-steps execution_id [execution_id]
+
+    $ ssm-automation-executions | ssm-automation-steps-executions
+    [Outputs detailed step information for each provided execution ID]
+
+
+### ssm-automation-execution
+
+Show details for an SSM Automation Execution
+
+    USAGE: ssm-automation-execution execution_id [execution_id]
+
+    $ ssm-automation-executions | head | ssm-automation-execution
+    1234abcd-5678-9def-ghij-klmnopqrstuv  DeployNewFeatures  i-01234a5b6c7d8e9f0  Failed  2023-09-10T10:10:10.000000+00:00  2023-09-10T10:10:20.000000+00:00
+    9876fedc-ba98-7654-c321-onmlkjihgfed  DeployNewFeatures  i-09876b5c4d3e2f1g0  Failed  2023-09-10T10:20:30.000000+00:00  2023-09-10T10:20:40.000000+00:00
+    abcd1234-efgh-5678-ijkl-9mnopq7rstuv  DeployNewFeatures  i-0a1b2c3d4e5f6g7h8  Failed  2023-09-10T10:30:50.000000+00:00  2023-09-10T10:31:00.000000+00:00
+    ijkl8765-ghij-4321-klmn-5opq4rstu3vw  DeployNewFeatures  i-0i8j7k6l5m4n3o2p1  Failed  2023-09-10T10:40:10.000000+00:00  2023-09-10T10:40:20.000000+00:00
+
+
+### ssm-associations
+
+List SSM associations
+
+    USAGE: ssm-associations [filter]
+
+    $ ssm-associations
+    Task-RunSecurityScan                cron(30 2 * * SUN)    2023-01-15T02:30:00.000000+00:00  Failed
+    Task-UpdateSystemPackages           cron(0 4 * * SAT)     2023-04-22T04:00:00.000000+00:00  Success
+    Service-ConfigureNetworkSettings    rate(7 days)          2023-05-07T11:00:00.000000+00:00  Success
+    Script-DeployMonitoringTools        cron(15 3 * * FRI)    2023-03-03T03:15:00.000000+00:00  Failed
+
+
+### ssm-association-executions
+
+List SSM Association Executions
+
+    USAGE: ssm-associations [filter]
+
+    $ ssm-associations
+    12345678-9abc-def0-1234-56789abcdef0  a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890  Success  {Success=10}  2023-07-21T10:30:00.000000+00:00
+    12345678-9abc-def0-1234-56789abcdef0  b1c2d3e4-f5g6-7890-b1c2-d3e4f5g67890  Success  {Success=15}  2023-07-22T11:00:00.000000+00:00
+    12345678-9abc-def0-1234-56789abcdef0  c1d2e3f4-g5h6-7890-c1d2-e3f4g5h67890  Success  {Success=13}  2023-07-23T09:45:00.000000+00:00
+    12345678-9abc-def0-1234-56789abcdef0  d1e2f3g4-h5i6-7890-d1e2-f3g4h5i67890  Failed   {Failed=2, Success=12} 2023-07-24T12:30:00.000000+00:00
+    12345678-9abc-def0-1234-56789abcdef0  e1f2g3h4-i5j6-7890-e1f2-g3h4i5j67890  Failed   {Failed=3, Success=11}  2023-07-25T14:15:00.000000+00:00
+
+
+### ssm-association-execution-targets
+
+List targets for SSM Association Execution
+
+    USAGE: ssm-association-execution-targets association-id execution-id
+
+    $ association-execution-targets abcd1234-ef56-7890-gh12-ijk3456lmnop  12345678-90ab-cdef-1234-567890abcdef
+    abcd1234-ef56-7890-gh12-ijk3456lmnop  12345678-90ab-cdef-1234-567890abcdef  i-01234abcde56789f0  Success  Success  2023-08-10T11:30:00.000000+00:00
+    abcd1234-ef56-7890-gh12-ijk3456lmnop  12345678-90ab-cdef-1234-567890abcdef  i-02345bcdef67891g1  Success  Success  2023-08-10T11:30:10.000000+00:00
+    abcd1234-ef56-7890-gh12-ijk3456lmnop  12345678-90ab-cdef-1234-567890abcdef  i-03456cdefg78912h2  Success  Success  2023-08-10T11:30:20.000000+00:00
+    abcd1234-ef56-7890-gh12-ijk3456lmnop  12345678-90ab-cdef-1234-567890abcdef  i-04567defgh89123i3  Success  Success  2023-08-10T11:30:30.000000+00:00
+
+Note: Can't use skim-stdin as it requires to arguments
+
+
+### ssm-parameters
+
+List SSM Parameters
+
+   USAGE: ssm-parameters [filter]
+
+   $ ssm-parameters
+   /company/ad/a1234567/username
+   /ami/Ubuntu-20.04-proxy
+   /cloudwatch-agent/config/general
+   /cnf/staticSite/B1P2V34SR5KF0Z/encryptionKeyArn
+   /ops/CloudMetrics/linux
+   /ops/CloudMetrics/windows
+
+
+### ssm-parameter-value
+
+Print SSM Parameter Value
+
+   USAGE: ssm-parameter-value ssm-parameter [ssm-parameter]
+
+   $ ssm-parameters | ssm-parameter-value
+   /ops/Monitoring/metrics/unix
+   {
+     "agent": {
+       "metrics_collection_interval": 60,
+       "logfile": "/var/log/aws-monitoring/aws-monitoring-agent.log"
+     },
+     "logs": {
+       "logs_collected": {
+         "files": {
+   <snip>
+another way to avoid ThrottlingException is to use get-parameters which takes an array of up to 10 params
 
 
 ### instance-ssm-platform-type

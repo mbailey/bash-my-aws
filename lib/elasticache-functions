@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# elasticache-functions
+#
+#
+
+
+elasticaches() {
+
+  # List elasticache thingies (code borrowed from target-groups)
+  #
+  #     $ target-groups
+  #     bash-my-aws-nlb-tg  TCP   22   vpc-04636ebe5573f6f65  instance  bash-my-aws-nlb
+  #     bash-my-aws-alb-tg  HTTP  443  vpc-04636ebe5573f6f65  instance  bash-my-aws-alb
+
+  local cache_names=$(skim-stdin)
+  local filters=$(__bma_read_filters $@)
+
+  aws elasticache describe-cache-clusters   \
+    --output text                    \
+    --query "
+      CacheClusters[][
+        CacheClusterId,
+        CacheNodeType,
+        Engine,
+        EngineVersion,
+        CacheClusterStatus
+      ]" |
+  grep -E -- "$filters" |
+  LC_ALL=C sort -b |
+  column -s$'\t' -t
+}
+
+
+elasticache-replication-groups() {
+
+  #
+  # Accepts a string to filter on
+  # This is not very useful without column headings.
+  # Most of the things you want to know about a replication group are boolean
+  # eg AutomaticFailover, MultiAZClusterEnabled, AtRestEncryptionEnabled etc
+
+  local ec_names=$(skim-stdin "$@")
+
+  for ec_name in $ec_names; do
+#  echo "ec_name=$ec_name"
+    aws elasticache describe-replication-groups \
+      --output text                        \
+      --query "
+        ReplicationGroups
+          [?contains(ReplicationGroupId, \`$ec_name\`) == \`true\`]
+          .[ReplicationGroupId,Status, CacheNodeType]
+      "
+  done | column -s$'\t' -t
+}
+# how to get ReplicationGroupId etc??

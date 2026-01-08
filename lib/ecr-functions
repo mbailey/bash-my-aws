@@ -10,7 +10,6 @@ ecr-repositories() {
   local filters=$(__bma_read_filters $@)
 
   aws ecr describe-repositories          \
-    ${aws_account_id/#/'--registry-id '} \
     --query "
       repositories[].[
         repositoryName,
@@ -34,6 +33,7 @@ ecr-repository-images() {
   local repository_names=$(skim-stdin "$@")
 
   # XXX Display USAGE if no repository_names passed in
+  [[ -z ${repository_names} ]] && __bma_usage "ecr" && return 1
 
   local repository_name
   for repository_name in $repository_names; do

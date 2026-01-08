@@ -90,6 +90,7 @@ stacks() {
     --output text       |
   grep -E -- "$filters" |
   LC_ALL=C sort -b -k 3 |
+    trim_date |
     columnise
 }
 
@@ -139,7 +140,7 @@ stack-create() {
   # to take advantage of shorter commands*
   #
   #     USAGE: stack-create stack [template-file] [parameters-file]             \
-  #                 [--capabilities=OPTIONAL_VALUE] [--role-arn=OPTIONAL_VALUE]
+  #                 [CAPABILITY_1 CAPABILITY_2] [--role-arn=OPTIONAL_VALUE]
   #
   #     $ stack-create params/asg-params-prod.json
   #     Resolved arguments: asg-prod ./asg.yml params/asg-params-prod.json
@@ -176,28 +177,57 @@ stack-create() {
   local inputs_array=($@)
   local IFS='=' # override default field separator in the scope of this function only
   local regex_role_arn="^\-\-role\-arn=.*"
-  local regex_capabilities="^\-\-capabilities=.*"
+  local list_capabilities=("CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND")
+
   for index in "${inputs_array[@]}" ; do
     if [[ "$index" =~ $regex_role_arn ]] ; then
       read arn_opt arn_arg <<< "$index" # ignore anything after option + arg
       arn="--role-arn $arn_arg"
-    elif [[ "$index" =~ $regex_capabilities ]] ; then
-      read caps_opt caps_arg <<< "$index" # ignore anything after option + arg
-      capabilities="--capabilities $caps_arg"
+    fi
+    # search for anything in the capabilities list, with or without "--capabilities"
+    test_capability=${index##* }
+    if [[ " $list_capabilities " =~  "$test_capability" ]] ; then
+      capabilities="${capabilities} ${test_capability}"
     fi
   done
+  if [ ! -z "${capabilities}" ] ; then
+    capabilities="--capabilities ${capabilities}"
+  fi
+  ## TODO: add capabilities shell completion
+
   unset IFS # to prevent it from breaking things later
 
-  if aws cloudformation create-stack \
+  if output=$(
+    aws cloudformation create-stack \
     --stack-name $stack              \
     --template-body file://$template \
     $parameters                      \
     $capabilities                    \
     $arn                             \
     --disable-rollback               \
-    --output text; then
+    --output text                    \
+     2>&1
+  ); then
     stack-tail $stack
+  else
+    echo "$output"
+    if [[ $output == *"InsufficientCapabilitiesException"* ]] ; then
+      for capability in ${list_capabilities} ; do
+        if [[ $output ==  *"$capability"* ]] ; then
+          capabilities="${capabilities} ${capability}"
+        fi
+      done
+      if [[ $capabilities ]] ; then
+        local regex_yes="^[Yy]$"
+        read -p "Do you want to try again with these capabilities? " -n 1 -r
+        echo
+        [[ $REPLY =~ $regex_yes ]] || return 0
+        stack-create $@ ${capabilities}
+      fi
+    fi
   fi
+
+
 }
 
 stack-update() {
@@ -257,7 +287,11 @@ stack-update() {
   local capabilities=''
   local capabilities_value=$(_bma_stack_capabilities $stack)
   [[ -z "${capabilities_value}" ]] || capabilities="--capabilities ${capabilities_value}"
-
+echo "aws cloudformation update-stack \
+    --stack-name $stack              \
+    --template-body file://$template \
+    $parameters                      \
+    $capabilities"
   if aws cloudformation update-stack \
     --stack-name $stack              \
     --template-body file://$template \
@@ -417,10 +451,10 @@ stack-resources() {
   local stack
   for stack in $stacks; do
     stack=$(_bma_stack_name_arg "$stack")
-    aws cloudformation describe-stack-resources                       \
+    aws cloudformation list-stack-resources                       \
       --stack-name $(_bma_stack_name_arg "$stack")                    \
       --output "${BMA_OUTPUT_AWS:-text}" \
-      --query "StackResources[].{
+      --query "StackResourceSummaries[].{
                PhysicalResourceId: PhysicalResourceId,
                ResourceType: ResourceType,
                ResourceStatus: ResourceStatus,
@@ -557,22 +591,22 @@ stack-tag() {
 # XXX Handy but dangerous - updating a nested stack breaks things. Put in a guard.
 # XXX
 # XXX stack-tag-apply() {
-# XXX 
+# XXX
 # XXX   # Apply a stack tag
-# XXX 
+# XXX
 # XXX   local tag_key=$1
 # XXX   local tag_value=$2
 # XXX   shift 2
 # XXX   local usage_msg="tag-key tag-value stack [stack]"
 # XXX   [[ -z "${tag_key}" ]]    && __bma_usage $usage_msg && return 1
 # XXX   [[ -z "${tag_value}" ]] && __bma_usage $usage_msg && return 1
-# XXX 
+# XXX
 # XXX   local stacks=$(skim-stdin "$@")
 # XXX   [[ -z "${stacks}" && -t 0 ]] && __bma_usage $usage_msg && return 1
-# XXX 
+# XXX
 # XXX   local stack
 # XXX   for stack in $stacks; do
-# XXX 
+# XXX
 # XXX     # XXX deal with tagging service failing
 # XXX     local tags=$(aws cloudformation describe-stacks \
 # XXX            --stack-name "$stack"                    \
@@ -580,7 +614,7 @@ stack-tag() {
 # XXX                   [{Key:'$tag_key', Value:'$tag_value'}],
 # XXX                   Stacks[].Tags[?Key != '$tag_key'][]
 # XXX                 ][]")
-# XXX 
+# XXX
 # XXX     local parameters=$(aws cloudformation describe-stacks \
 # XXX            --stack-name "$stack"                          \
 # XXX            --query '
@@ -588,11 +622,11 @@ stack-tag() {
 # XXX                ParameterKey: ParameterKey,
 # XXX                UsePreviousValue: `true`
 # XXX            }')
-# XXX 
+# XXX
 # XXX     local capabilities=''
 # XXX     local capabilities_value=$(_bma_stack_capabilities $stack)
 # XXX     [[ -z "${capabilities_value}" ]] || capabilities="--capabilities ${capabilities_value}"
-# XXX 
+# XXX
 # XXX      $([[ -n $DRY_RUN ]] && echo echo) aws cloudformation update-stack \
 # XXX       --stack-name "$stack"         \
 # XXX       --use-previous-template       \
@@ -607,26 +641,26 @@ stack-tag() {
 # XXX Handy but dangerous - updating a nested stack breaks things. Put in a guard.
 # XXX
 # XXX stack-tag-delete() {
-# XXX 
+# XXX
 # XXX   # delete a stack tag
-# XXX 
+# XXX
 # XXX   local tag_key=$1
 # XXX   shift 1
 # XXX   [[ -z "${tag_key}" ]] && __bma_usage "tag-key stack [stack]" && return 1
-# XXX 
+# XXX
 # XXX   local stacks=$(skim-stdin "$@")
 # XXX   [[ -z "${stacks}" ]] && __bma_usage "tag-key stack [stack]" && return 1
-# XXX 
+# XXX
 # XXX   local stack
 # XXX   for stack in $stacks; do
-# XXX 
+# XXX
 # XXX     # XXX deal with tagging service failing
 # XXX     local tags=$(aws cloudformation describe-stacks \
 # XXX            --stack-name "$stack"                    \
 # XXX            --query "[
 # XXX                   Stacks[].Tags[?Key != '$tag_key'][]
 # XXX                 ][]")
-# XXX 
+# XXX
 # XXX     local parameters=$(aws cloudformation describe-stacks \
 # XXX            --stack-name "$stack"                          \
 # XXX            --query '
@@ -634,13 +668,13 @@ stack-tag() {
 # XXX                ParameterKey: ParameterKey,
 # XXX                UsePreviousValue: `true`
 # XXX            }')
-# XXX 
+# XXX
 # XXX     aws cloudformation update-stack \
 # XXX       --stack-name "$stack"         \
 # XXX       --use-previous-template       \
 # XXX       --parameters "$parameters"    \
 # XXX       --tags "$tags"
-# XXX 
+# XXX
 # XXX   done
 # XXX }
 
@@ -681,19 +715,20 @@ stack-tail() {
 
 stack-template() {
 
-  # Return template of a stack
+  # Return template of each stack
+  local stacks=$(skim-stdin "$@")
 
-  local inputs=$(skim-stdin "$@")
-  local stack=$(_bma_stack_name_arg ${inputs})
+  [[ -z ${stacks} ]] && __bma_usage "stack [stack]" && return 1
+  local stack
+  for stack in $stacks; do
 
-  [[ -z ${stack} ]] && __bma_usage "stack" && return 1
-
-  aws cloudformation get-template       \
-    --stack-name "$stack"               \
-    --query TemplateBody                |
-  jq --raw-output --sort-keys .         |
-  sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba'   # remove trailing blank lines
+    aws cloudformation get-template       \
+      --stack-name "$stack"               \
+      --query TemplateBody                |
+    jq --raw-output --sort-keys .         |
+    sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba'   # remove trailing blank lines
                                           # sometimes appended by jq
+  done
 }
 
 stack-template-changeset-latest() {
@@ -791,6 +826,88 @@ stack-validate() {
   fi
 }
 
+
+stack-detect-drift() {
+
+  # Detect drift for provided stacks; and print coloured diff
+  local stacks=$(skim-stdin "$@")
+  [[ -z ${stacks} ]] && __bma_usage "stack [stack]" && return 1
+
+  for stack in $stacks; do
+    driftDetectionId=$(aws cloudformation detect-stack-drift \
+      --stack-name "$stack" --output text)
+    DetectionStatus=""
+    while [[ "$DetectionStatus" != "DETECTION_COMPLETE" ]]; do
+      printf "."
+      DescribeDriftDetectionStatus=$(aws cloudformation describe-stack-drift-detection-status \
+        --stack-drift-detection-id $driftDetectionId )
+      DetectionStatus=$(echo $DescribeDriftDetectionStatus | jq --raw-output .DetectionStatus )
+      StackDriftStatus=$(echo $DescribeDriftDetectionStatus | jq --raw-output .StackDriftStatus)
+      sleep 5;
+    done
+    if [[ "$StackDriftStatus" == "IN_SYNC" ]]; then
+      echo
+      echo "$stack is in sync"
+    else
+      echo "$stack has drifted"
+      stack-diff-drift $stack
+    fi
+  done
+
+}
+
+stack-describe-drift() {
+
+  # List stack-tags applied to a stack
+
+  local inputs=$(skim-stdin "$@")
+  local stack=$(_bma_stack_name_arg ${inputs})
+
+  [[ -z ${stack} ]] && __bma_usage "stack" && return 1
+
+  stackResourceDrifts=$( aws cloudformation describe-stack-resource-drifts \
+    --stack-name "$stack"            \
+    --query 'StackResourceDrifts[*].{StackId:StackId,ExpectedProperties:ExpectedProperties,ActualProperties:ActualProperties}' )
+# jq -S <<< $stackResourceDrifts
+  ExpectedProperties=$(echo $stackResourceDrifts | jq --raw-output .[].ExpectedProperties)
+#  ExpectedPropertiesPretty=$(jq . -S --raw-output <<< "$ExpectedProperties")
+  ActualProperties=$(echo $stackResourceDrifts | jq --raw-output .[].ActualProperties)
+#  ActualPropertiesPretty=$(jq . -S --raw-output <<< "$ActualProperties")
+  echo
+ echo "Expected Properties:"
+ jq . <<< "$ExpectedProperties"
+ echo "Actual Properties:"
+ jq . <<< "$ActualProperties"
+  echo
+
+}
+
+stack-diff-drift() {
+
+  # List stack-tags applied to a stack
+
+  local inputs=$(skim-stdin "$@")
+  local stack=$(_bma_stack_name_arg ${inputs})
+
+  [[ -z ${stack} ]] && __bma_usage "stack" && return 1
+
+  stackResourceDrifts=$( aws cloudformation describe-stack-resource-drifts \
+    --stack-name "$stack"            \
+    --query 'StackResourceDrifts[*].{StackId:StackId,ExpectedProperties:ExpectedProperties,ActualProperties:ActualProperties}' )
+# jq -S <<< $stackResourceDrifts
+  ExpectedProperties=$(echo $stackResourceDrifts | jq --raw-output .[].ExpectedProperties)
+  ExpectedPropertiesPretty=$(jq . -S --raw-output <<< "$ExpectedProperties")
+  ActualProperties=$(echo $stackResourceDrifts | jq --raw-output .[].ActualProperties)
+  ActualPropertiesPretty=$(jq . -S --raw-output <<< "$ActualProperties")
+  echo
+  # TODO : check whether diff is installed, otherwise just print $ExpectedPropertiesPretty and $ActualPropertiesPretty
+  echo "The diff ( Expected | Actual )"
+  diff -y --left-column --color=always <(printf %s "$ExpectedPropertiesPretty") <(printf %s "$ActualPropertiesPretty")
+
+}
+
+
+
 stack-diff(){
 
   # Compare live stack against local template (and optional params file)
@@ -845,7 +962,7 @@ _bma_stack_diff_template() {
   elif command -v icdiff; then
     local DIFF_CMD=icdiff
   else
-    local DIFF_CMD=diff
+    local DIFF_CMD='diff --color=always'
   fi
 
   $DIFF_CMD -u                     \
@@ -971,7 +1088,8 @@ _bma_stack_args(){
     __bma_error "Could not find params file (${params})."
   else
     # Display calling (or current if none) with expanded arguments
-    echo "Resolved arguments: $stack $template $params"
+    # echo "Resolved arguments: $stack $template $params"
+    true
   fi
 }
 

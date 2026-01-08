@@ -32,6 +32,29 @@ elbv2s() {
     columnise
 }
 
+elbv2-arn(){
+
+  # List DNS Names of elbv2(s)
+  #
+  #     USAGE: elbv2-dnsname load-balancer [load-balancer]
+  #
+  #     $ elbv2s | elbv2-dnsname
+  #     bash-my-aws      bash-my-aws-c23c598688520e51.elb.ap-southeast-2.amazonaws.com
+  #     bash-my-aws-alb  bash-my-aws-alb-2036199590.ap-southeast-2.elb.amazonaws.com
+
+  local elbv2_names=$(skim-stdin "$@")
+  [[ -z "${elbv2_names}" ]] && __bma_usage "load-balancer [load-balancer]" && return 1
+
+  aws elbv2 describe-load-balancers \
+    --names $elbv2_names            \
+    --output text                   \
+    --query "
+      LoadBalancers[][
+        LoadBalancerArn
+      ]"              |
+    columnise
+}
+
 elbv2-dnsname(){
 
   # List DNS Names of elbv2(s)

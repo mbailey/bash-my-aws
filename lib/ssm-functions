@@ -388,7 +388,8 @@ ssm-parameters() {
   #    /cnf/staticSite/B1P2V34SR5KF0Z/encryptionKeyArn
   #    /ops/CloudMetrics/linux
   #    /ops/CloudMetrics/windows
-
+  export AWS_MAX_ATTEMPTS=10
+  export AWS_RETRY_MODE=adaptive  # try to avoid throttling exceptions
   local filters=$(__bma_read_filters $@)
   aws ssm describe-parameters \
     --output text \
@@ -422,6 +423,7 @@ ssm-parameter-value() {
     aws ssm get-parameter \
       --name "$parameter" \
       --query Parameter.Value \
+      --with-decryption \
       --output json
   done
 }
