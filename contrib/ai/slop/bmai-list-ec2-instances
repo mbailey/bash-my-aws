@@ -1,0 +1,24 @@
+instances() {
+  local instance_ids=$(skim-stdin "$@")
+  local filters=$(__bma_read_filters $@)
+
+  aws ec2 describe-instances                                            \
+    ${instance_ids/#/'--instance-ids '}                                \
+    --query "
+      Reservations[].Instances[][
+        InstanceId,
+        State.Name,
+        InstanceType,
+        LaunchTime,
+        join(',', [Tags[?Key=='Name'].Value || 'NO_NAME'][]),
+        join(',', [Tags[?Key=='application'].Value || 'NO_APP'][]),
+        Placement.AvailabilityZone,
+        VpcId,
+        PrivateIpAddress,
+        PublicIpAddress || 'NO_PUBLIC_IP'
+      ]"                                                               \
+    --output text       |
+  grep -E -- "$filters" |
+  sort -k 5,5           |
+  columnise
+}

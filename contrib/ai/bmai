@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+# bmai - Wrapper for llm prompt command to generate functions
+
+bmai() {
+    
+    if [ $# -lt 1 ]; then
+        echo "Usage: bmai <the non-existant command in plain english>" >&2
+        return 1
+    fi
+    
+    local conventions="${BMA_HOME:-$HOME/.bash-my-aws}/CONVENTIONS.md"
+    
+    if [ ! -f "$conventions" ]; then
+        echo "Error: CONVENTIONS.md file not found: $conventions" >&2
+        return 1
+    fi
+
+    local prompt="
+      Create an authentic working bash-my-aws command that does the following: '$@'
+
+      - Do not provide a preamble or closing comments.
+    "
+    
+    # Create a filename by converting the prompt to lowercase, replacing spaces with hyphens,
+    # and truncating to 50 chars
+    local filename=$(echo "$*" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | cut -c1-50)
+   
+    local ai_slop_dir="${BMA_HOME:-$HOME/.bash-my-aws}/contrib/ai/slop"
+    mkdir -p "${ai_slop_dir}"
+    local output_file="${ai_slop_dir}/${filename}"
+    
+    llm prompt \
+        -s "$(<"${conventions}")" \
+        "Do not provide a preamble or closing comments. Output only an authentic bash-my-aws command that follows the conventions and does the following: '$@'" \
+    | tee "${output_file}"
+}
+
+# Execute function with same name as file called unless sourced
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  "$(basename "$0")" "$@"
+fi

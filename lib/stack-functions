@@ -1126,4 +1126,198 @@ _bma_stack_capabilities() {
   aws cloudformation describe-stacks --stack-name "$1" --query 'Stacks[].Capabilities' --output text
 }
 
+stack-drift-detect() {
+  # Initiate drift detection for CloudFormation stacks (non-blocking)
+  #
+  #     $ stack-drift-detect my-stack
+  #     my-stack  d290f1ee-6c54-4b01-90e6-d701748f0851  DETECTION_IN_PROGRESS
+  #
+  #     $ stacks | stack-drift-detect
+  #     web-stack   a123b456-7c89-0d12-34e5-678901234567  DETECTION_IN_PROGRESS
+  #     app-stack   b234c567-8d90-1e23-45f6-789012345678  DETECTION_IN_PROGRESS
+  #     data-stack  c345d678-9e01-2f34-56a7-890123456789  DETECTION_IN_PROGRESS
+  #
+  # Note: This function initiates drift detection and returns immediately.
+  # Use stack-drift-status to check progress or stack-drift-resources to see results.
+
+  local stack_names=$(skim-stdin "$@")
+  [[ -z "$stack_names" ]] && __bma_usage "stack-name [stack-name]" && return 1
+
+  # Create temporary directory for results
+  local tmp_dir=$(mktemp -d)
+  trap "rm -rf $tmp_dir" EXIT
+  
+  local stack_name
+  for stack_name in $stack_names; do
+    (
+      # Run drift detection in parallel
+      local drift_detection_id=$(
+        aws cloudformation detect-stack-drift \
+          --stack-name "$stack_name" \
+          --output text \
+          --query 'StackDriftDetectionId' 2>/dev/null
+      )
+      
+      if [[ -z "$drift_detection_id" ]]; then
+        echo "$stack_name	ERROR	FAILED_TO_INITIATE" > "$tmp_dir/$stack_name.result"
+      else
+        echo "$stack_name	$drift_detection_id	DETECTION_IN_PROGRESS" > "$tmp_dir/$stack_name.result"
+      fi
+    ) &
+    
+    # Limit the number of parallel processes to avoid overwhelming the API
+    # AWS rate limits: 20 requests per second for detect-stack-drift
+    if [[ $(jobs -r | wc -l) -ge 10 ]]; then
+      wait -n
+    fi
+  done
+  
+  # Wait for all background jobs to complete
+  wait
+  
+  # Collect and display results in order
+  for stack_name in $stack_names; do
+    if [[ -f "$tmp_dir/$stack_name.result" ]]; then
+      cat "$tmp_dir/$stack_name.result"
+    fi
+  done | columnise
+}
+
+stack-drift-status() {
+  # Check the status of drift detection for CloudFormation stacks
+  #
+  #     $ stack-drift-status my-stack
+  #     my-stack  DETECTION_COMPLETE  DRIFTED  2025-08-06T10:30:00Z  120
+  #
+  #     $ stacks | stack-drift-status
+  #     web-stack   DETECTION_COMPLETE     DRIFTED     2025-08-06T09:15:00Z  45
+  #     app-stack   DETECTION_IN_PROGRESS  UNKNOWN     2025-08-06T09:20:00Z  15
+  #     data-stack  DETECTION_COMPLETE     IN_SYNC     2025-08-06T09:18:00Z  30
+
+  local stack_names=$(skim-stdin "$@")
+  [[ -z "$stack_names" ]] && __bma_usage "stack-name [stack-name]" && return 1
+
+  # Create temporary directory for results
+  local tmp_dir=$(mktemp -d)
+  trap "rm -rf $tmp_dir" EXIT
+  
+  local stack_name
+  for stack_name in $stack_names; do
+    (
+      # Get stack drift status in parallel
+      aws cloudformation describe-stacks \
+        --stack-name "$stack_name" \
+        --output text \
+        --query '
+          Stacks[].[
+            StackName,
+            DriftInformation.StackDriftStatus || `NOT_CHECKED`,
+            DriftInformation.LastCheckTimestamp || `NEVER`
+          ]' 2>/dev/null > "$tmp_dir/$stack_name.result" || \
+          echo "$stack_name	ERROR	STACK_NOT_FOUND" > "$tmp_dir/$stack_name.result"
+    ) &
+    
+    # Limit the number of parallel processes to avoid overwhelming the API
+    # AWS rate limits: describe-stacks can handle higher concurrency
+    if [[ $(jobs -r | wc -l) -ge 20 ]]; then
+      wait -n
+    fi
+  done
+  
+  # Wait for all background jobs to complete
+  wait
+  
+  # Collect and display results in order
+  for stack_name in $stack_names; do
+    if [[ -f "$tmp_dir/$stack_name.result" ]]; then
+      cat "$tmp_dir/$stack_name.result"
+    fi
+  done | columnise
+}
+
+stack-drift-resources() {
+  # List drifted resources in CloudFormation stacks
+  #
+  #     $ stack-drift-resources my-stack
+  #     my-stack  MyBucket         AWS::S3::Bucket        MODIFIED  2025-08-06T10:30:00Z  BucketEncryption
+  #     my-stack  MyTable          AWS::DynamoDB::Table   DELETED   2025-08-06T10:30:00Z  RESOURCE_DELETED
+  #
+  #     $ stacks | stack-drift-resources
+  #     web-stack   WebBucket       AWS::S3::Bucket        MODIFIED  2025-08-06T09:15:00Z  Tags
+  #     app-stack   NO_DRIFT_DATA   Run_stack-drift-detect_first
+  #     data-stack  IN_SYNC         No_drifted_resources_found
+  #
+  # Note: This shows results from the most recent drift detection.
+  # If no drift detection has been run, it will indicate this in the output.
+
+  local stack_names=$(skim-stdin "$@")
+  [[ -z "$stack_names" ]] && __bma_usage "stack-name [stack-name]" && return 1
+
+  # Create temporary directory for results
+  local tmp_dir=$(mktemp -d)
+  trap "rm -rf $tmp_dir" EXIT
+  
+  local stack_name
+  for stack_name in $stack_names; do
+    (
+      # First check if drift detection has been performed
+      local drift_status=$(
+        aws cloudformation describe-stacks \
+          --stack-name "$stack_name" \
+          --output text \
+          --query 'Stacks[0].DriftInformation.StackDriftStatus' 2>/dev/null
+      )
+      
+      if [[ -z "$drift_status" ]] || [[ "$drift_status" == "None" ]]; then
+        echo "$stack_name	ERROR	STACK_NOT_FOUND" > "$tmp_dir/$stack_name.result"
+      elif [[ "$drift_status" == "NOT_CHECKED" ]]; then
+        echo "$stack_name	NO_DRIFT_DATA	Run_stack-drift-detect_first" > "$tmp_dir/$stack_name.result"
+      elif [[ "$drift_status" == "IN_SYNC" ]]; then
+        echo "$stack_name	IN_SYNC	No_drifted_resources_found" > "$tmp_dir/$stack_name.result"
+      else
+        # Get drifted resources
+        local temp_file="$tmp_dir/$stack_name.drift"
+        aws cloudformation describe-stack-resource-drifts \
+          --stack-name "$stack_name" \
+          --stack-resource-drift-status-filters MODIFIED DELETED \
+          --output text \
+          --query '
+            StackResourceDrifts[].[
+              LogicalResourceId,
+              ResourceType,
+              StackResourceDriftStatus,
+              Timestamp,
+              join(`,`, PropertyDifferences[].PropertyPath) || `RESOURCE_DELETED`
+            ]' 2>/dev/null > "$temp_file"
+        
+        if [[ -s "$temp_file" ]]; then
+          # Process drift results
+          while IFS=$'\t' read -r logical_id resource_type drift_status timestamp properties; do
+            echo "$stack_name	$logical_id	$resource_type	$drift_status	$timestamp	$properties"
+          done < "$temp_file" > "$tmp_dir/$stack_name.result"
+        else
+          # No drifted resources but status shows drift
+          echo "$stack_name	NO_RESOURCES	Drift_detected_but_no_resources_listed" > "$tmp_dir/$stack_name.result"
+        fi
+      fi
+    ) &
+    
+    # Limit the number of parallel processes
+    # This makes two API calls per stack, so use lower concurrency
+    if [[ $(jobs -r | wc -l) -ge 10 ]]; then
+      wait -n
+    fi
+  done
+  
+  # Wait for all background jobs to complete
+  wait
+  
+  # Collect and display results in order
+  for stack_name in $stack_names; do
+    if [[ -f "$tmp_dir/$stack_name.result" ]]; then
+      cat "$tmp_dir/$stack_name.result"
+    fi
+  done | columnise
+}
+
 ## vim: ft=sh

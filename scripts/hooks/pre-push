@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+# Pre-push hook to check that generated files are up to date
+#
+# Install with:
+#   ln -sf ../../scripts/hooks/pre-push .git/hooks/pre-push
+#
+# Or use:
+#   make install-hooks
+
+set -e
+
+# Get the project root
+project_root="$(cd "$(dirname "$0")/../.." && pwd)"
+
+echo "Checking generated files are up to date..."
+
+cd "$project_root"
+
+# Run the check
+if make check; then
+    exit 0
+else
+    echo ""
+    echo "Push blocked: Generated files are out of date."
+    echo "Run 'make build' and commit the changes, then try again."
+    exit 1
+fi

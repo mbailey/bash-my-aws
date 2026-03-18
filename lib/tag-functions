@@ -28,3 +28,9 @@ tag-values() {
     --query "TagValues[].['$key', @]"         |
   sort
 }
+
+tag-split() {
+  # Split AWS resource tags into one tag per line
+  # Usage: bma instances | tail -1 | bma instance-tags | tag-split
+  sed 's/ \([^= ]*=\)/\n\1/g'
+}

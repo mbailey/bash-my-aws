@@ -12,3 +12,5 @@ site/
 *.swp
 cloudformation/stars2.yml
 lib/extras/github-functions
+.aider*
+.env

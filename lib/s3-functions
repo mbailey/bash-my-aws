@@ -2,7 +2,6 @@
 #
 # s3-functions
 
-
 buckets() {
 
   # List S3 Buckets
@@ -16,16 +15,15 @@ buckets() {
   local filters=$(__bma_read_filters $@)
 
   aws s3api list-buckets \
-    --output text        \
+    --output text \
     --query "
       Buckets[${buckets:+?contains(['${buckets// /"','"}'], Name)}].[
         Name,
         CreationDate
-      ]"                |
-  grep -E -- "$filters" |
-  column -t
+      ]" |
+    grep -E -- "$filters" |
+    column -t
 }
-
 
 bucket-acls() {
 
@@ -45,16 +43,15 @@ bucket-acls() {
   local bucket
   for bucket in $buckets; do
     aws s3api get-bucket-acl \
-      --bucket "$bucket"     \
-      --output text          \
+      --bucket "$bucket" \
+      --output text \
       --query "[
         '$bucket',
         join(' ', Grants[?Grantee.Type=='Group'].[join('=',[Permission, Grantee.URI])][])
       ]" |
-    sed 's#http://acs.amazonaws.com/groups/##g'
+      sed 's#http://acs.amazonaws.com/groups/##g'
   done
 }
-
 
 bucket-remove() {
 
@@ -77,15 +74,13 @@ bucket-remove() {
   local regex_yes="^[Yy]$"
   read -p "Are you sure you want to continue? " -n 1 -r
   echo
-  if [[ $REPLY =~ $regex_yes ]]
-  then
+  if [[ $REPLY =~ $regex_yes ]]; then
     local bucket
     for bucket in $buckets; do
       aws s3 rb "s3://${bucket}"
     done
   fi
 }
-
 
 bucket-remove-force() {
 
@@ -107,8 +102,7 @@ bucket-remove-force() {
   local regex_yes="^[Yy]$"
   read -p "Are you sure you want to continue? " -n 1 -r
   echo
-  if [[ $REPLY =~ $regex_yes ]]
-  then
+  if [[ $REPLY =~ $regex_yes ]]; then
     local bucket
     for bucket in $buckets; do
       aws s3 rb --force "s3://${bucket}"
@@ -116,3 +110,213 @@ bucket-remove-force() {
   fi
 }
 
+bucket-size() {
+  # List S3 bucket sizes by storage class using CloudWatch metrics
+  #
+  # USAGE: bucket-size [--all] [bucket-name] [bucket-name]
+  #        echo [bucket-name] | bucket-size [--all]
+  #
+  # OPTIONS:
+  #   --all    Show all storage classes (slower but more comprehensive)
+  #
+  # EXAMPLES:
+  #     $ bucket-size my-bucket
+  #     my-bucket  STANDARD=15.4GB  STANDARD_IA=0B  GLACIER=2.1GB  DEEP_ARCHIVE=0B
+  #
+  #     $ bucket-size --all my-bucket
+  #     my-bucket  STANDARD=15.4GB  INTELLIGENT_TIERING_FA=0B  INTELLIGENT_TIERING_IA=0B  GLACIER=2.1GB  ...
+  #
+  #     $ buckets | bucket-size
+  #     my-bucket1  STANDARD=15.4GB  STANDARD_IA=0B  GLACIER=2.1GB  DEEP_ARCHIVE=0B
+  #     my-bucket2  STANDARD=1.2GB   STANDARD_IA=0B  GLACIER=0B     DEEP_ARCHIVE=0B
+  #
+  # NOTE: Press CTRL-C to exit early when processing multiple buckets.
+
+  # Process arguments
+  local show_all=false
+  local args=()
+
+  for arg in "$@"; do
+    if [[ "$arg" == "--all" ]]; then
+      show_all=true
+    else
+      args+=("$arg")
+    fi
+  done
+
+  # Get bucket names from arguments or stdin
+  local bucket_names=$(skim-stdin "${args[@]}")
+  [[ -z "$bucket_names" ]] && __bma_usage "[--all] bucket-name [bucket-name]" && return 1
+
+  # Set up trap for CTRL-C with cleaner handling
+  local trap_set="true"
+  trap 'echo ""; echo "Interrupted by user"; trap - INT; kill $(jobs -p) 2>/dev/null; return 1' INT
+
+  # Define storage types based on --all flag
+  local storage_types
+
+  # Common storage types (default)
+  local common_storage_types=(
+    "StandardStorage"
+    "StandardIAStorage"
+    "GlacierStorage"
+    "DeepArchiveStorage"
+  )
+
+  # All storage types
+  local all_storage_types=(
+    "StandardStorage"
+    "IntelligentTieringFAStorage"
+    "IntelligentTieringIAStorage"
+    "IntelligentTieringAAStorage"
+    "IntelligentTieringAIAStorage"
+    "IntelligentTieringDAAStorage"
+    "StandardIAStorage"
+    "StandardIASizeOverhead"
+    "OneZoneIAStorage"
+    "OneZoneIASizeOverhead"
+    "ReducedRedundancyStorage"
+    "GlacierStorage"
+    "GlacierStagingStorage"
+    "GlacierObjectOverhead"
+    "GlacierS3ObjectOverhead"
+    "DeepArchiveStorage"
+    "DeepArchiveObjectOverhead"
+    "DeepArchiveS3ObjectOverhead"
+  )
+
+  # Set storage types based on flag
+  if [[ "$show_all" == "true" ]]; then
+    storage_types=("${all_storage_types[@]}")
+  else
+    storage_types=("${common_storage_types[@]}")
+  fi
+
+  # Display names for storage types
+  declare -A display_names=(
+    ["StandardStorage"]="STANDARD"
+    ["IntelligentTieringFAStorage"]="INTELLIGENT_TIERING_FA"
+    ["IntelligentTieringIAStorage"]="INTELLIGENT_TIERING_IA"
+    ["IntelligentTieringAAStorage"]="INTELLIGENT_TIERING_AA"
+    ["IntelligentTieringAIAStorage"]="INTELLIGENT_TIERING_AIA"
+    ["IntelligentTieringDAAStorage"]="INTELLIGENT_TIERING_DAA"
+    ["StandardIAStorage"]="STANDARD_IA"
+    ["StandardIASizeOverhead"]="STANDARD_IA_OVERHEAD"
+    ["OneZoneIAStorage"]="ONEZONE_IA"
+    ["OneZoneIASizeOverhead"]="ONEZONE_IA_OVERHEAD"
+    ["ReducedRedundancyStorage"]="RRS"
+    ["GlacierStorage"]="GLACIER"
+    ["GlacierStagingStorage"]="GLACIER_STAGING"
+    ["GlacierObjectOverhead"]="GLACIER_OVERHEAD"
+    ["GlacierS3ObjectOverhead"]="GLACIER_S3_OVERHEAD"
+    ["DeepArchiveStorage"]="DEEP_ARCHIVE"
+    ["DeepArchiveObjectOverhead"]="DEEP_ARCHIVE_OVERHEAD"
+    ["DeepArchiveS3ObjectOverhead"]="DEEP_ARCHIVE_S3_OVERHEAD"
+  )
+
+  # Function to format size in human-readable format
+  format_size() {
+    local bytes=$1
+
+    # Use awk for all comparisons to handle floating point numbers properly
+    awk -v bytes="$bytes" '
+    BEGIN {
+      if (bytes == 0) {
+        print "0B"
+      } else if (bytes < 1024) {
+        printf "%.0fB", bytes
+      } else if (bytes < 1048576) {
+        printf "%.1fKB", bytes/1024
+      } else if (bytes < 1073741824) {
+        printf "%.1fMB", bytes/1048576
+      } else if (bytes < 1099511627776) {
+        printf "%.1fGB", bytes/1073741824
+      } else if (bytes < 1125899906842624) {
+        printf "%.1fTB", bytes/1099511627776
+      } else {
+        printf "%.1fPB", bytes/1125899906842624
+      }
+    }'
+  }
+
+  # Create a temporary directory for results
+  local tmp_dir=$(mktemp -d)
+
+  # Process each bucket
+  local bucket_name
+  for bucket_name in $bucket_names; do
+    # Get the start and end time once for all queries
+    local start_time=$(date -u -d '2 days ago' '+%Y-%m-%dT%H:%M:%SZ')
+    local end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+    # Create a directory for this bucket's results
+    mkdir -p "${tmp_dir}/${bucket_name}"
+
+    # Launch parallel requests for each storage type
+    for storage_type in "${storage_types[@]}"; do
+      (
+        # Get metrics for this storage type
+        aws cloudwatch get-metric-statistics \
+          --namespace AWS/S3 \
+          --metric-name BucketSizeBytes \
+          --dimensions Name=BucketName,Value="$bucket_name" Name=StorageType,Value="$storage_type" \
+          --start-time "$start_time" \
+          --end-time "$end_time" \
+          --period 86400 \
+          --statistics Average \
+          --output json >"${tmp_dir}/${bucket_name}/${storage_type}.json"
+      ) &
+
+      # Limit the number of parallel processes to avoid overwhelming the system
+      # Adjust this number based on your system's capabilities
+      if [[ $(jobs -r | wc -l) -ge 10 ]]; then
+        wait -n
+      fi
+    done
+
+    # Wait for all background jobs to complete for this bucket
+    wait
+
+    # Process the results
+    local output="$bucket_name"
+    local has_data=false
+
+    for storage_type in "${storage_types[@]}"; do
+      local metric_data_file="${tmp_dir}/${bucket_name}/${storage_type}.json"
+
+      if [[ -f "$metric_data_file" ]]; then
+        # Extract and format the size
+        local size=0
+        local datapoints_count=$(jq '.Datapoints | length' <"$metric_data_file")
+
+        if [[ $datapoints_count -gt 0 ]]; then
+          size=$(jq -r '.Datapoints[0].Average' <"$metric_data_file")
+        fi
+
+        local formatted_size=$(format_size $size)
+
+        # Determine if we should show this storage type
+        # - Always show common storage types
+        # - For all storage types, only show non-zero ones (except STANDARD)
+        if [[ "$show_all" == "false" ]] || [[ "$size" != "0" ]] || [[ "$storage_type" == "StandardStorage" ]]; then
+          display_name="${display_names[$storage_type]}"
+          output="$output"$'\t'"$display_name=$formatted_size"
+          has_data=true
+        fi
+      fi
+    done
+
+    # If no data was found, at least show STANDARD=0B
+    if [[ "$has_data" == "false" ]]; then
+      output="$output"$'\t'"STANDARD=0B"
+    fi
+
+    echo "$output"
+  done | columnise
+
+  # Clean up temporary files
+  rm -rf "$tmp_dir"
+
+  # Reset the trap when we're done
+  trap - INT
+}

@@ -36,7 +36,8 @@ ssm-instances() {
         PlatformName,
         PlatformVersion,
         IPAddress,
-        ComputerName
+        ComputerName,
+        PlatformType
       ]" |
     grep -E -- "$filters" |
     LC_ALL=C sort -t $'\t' -k 6 |
@@ -202,7 +203,7 @@ ssm-automation-executions() {
         ExecutionEndime
       ]' \
   | grep -E -- "$filters" \
-  | LC_ALL=C sort -k 5 -t $'\t' \
+  | LC_ALL=C sort -k 6 -t $'\t' \
   | columnise
 }
 

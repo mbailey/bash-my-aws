@@ -335,6 +335,19 @@ subscriptions() {
     columnise
 }
 
+subscriptions-each() {
+    local old_subscription="$(bma subscription | cut -f1)";
+    local old_rg="$(bma resource-group | cut -f1)";
+    bma resource-group-unset
+    local subscription
+    for subscription in $(bma subscriptions | cut -f1); do
+        bma subscription "$subscription"
+        eval "$@"
+    done;
+    bma subscription "$(bma "$old_subscription")"
+    bma resource-group "$old_rg"
+}
+
 subscription() {
 
   local subscription=$(skim-stdin-bma "$@")
@@ -712,8 +725,9 @@ connector-groups() {
     --method get \
     --url "$url" \
     --output "$output_format" \
-    --query 'value[].[id, name, region, connectorGroupType, isDefault]' --output tsv |
-    sort -k 2
+    --query 'value[].[id, name, region, connectorGroupType, isDefault]' --output tsv \
+  | LC_ALL=C sort -k 2 \
+  | columnise
 }
 
 connector-group-apps() {
@@ -737,14 +751,15 @@ connector-group-apps() {
         displayName,
         createdDateTime
       ]' \
-      --output tsv |
-      sort -k 2
+      --output tsv \
+    | LC_ALL=C sort -k 2 \
+    | columnise
   done
 }
 
 connector-group-members() {
 
-  # Usage: connector-group-apps CONNECTOR_GROUP [CONNECTOR_GROUP]
+  # Usage: connector-group-members CONNECTOR_GROUP [CONNECTOR_GROUP]
 
   local cgs=$(skim-stdin "$@")
   [[ -z $cgs ]] && __bma_usage "CONNECTOR_GROUP [CONNECTOR_GROUP]" && return 1
@@ -764,12 +779,34 @@ connector-group-members() {
         machineName,
         externalIp
       ]' \
-      --output tsv |
-      sort -k 2
+      --output tsv \
+    | LC_ALL=C sort -k 2 \
+    | columnise
   done
 }
 # https://graph.microsoft.com/beta/rolemanagement/directory/transitiveRoleAssignments?$count=true&$filter=principalId eq '12345'
 # https://graph.microsoft.com/beta/onPremisesPublishingProfiles/applicationProxy/connectors
+
+
+# Get instance ids for connectors
+#
+# This works...
+#
+# $ connector-groups prd-connectors | connector-group-members > prd-connectors
+# $ ssm-instances | rg -f <(cut -f3 prd-connectors) > prd-connectors-instances
+#
+# But this is not working...
+#
+# connector-group-instances() {
+#   local cgs=$(skim-stdin "$@")
+#   [[ -z $cgs ]] && __bma_usage "CONNECTOR_GROUP [CONNECTOR_GROUP]" && return 1
+# 
+#   for cg in cgs; do
+# 
+#       ssm-instances \
+#       | rg -f <( connector-group-members "$cg" | cut -f3)
+#   done
+# }
 
 # TODO
 
@@ -780,9 +817,10 @@ deployments-group() {
       name,
       properties.timestamp
     ]' \
-    --output tsv |
-    grep -E -- "$filters" |
-    LC_ALL=C sort -k 2
+    --output tsv \
+    | grep -E -- "$filters" \
+    | LC_ALL=C sort -k 2 \
+    | columnise
 }
 
 alias deployments=deployments-group
@@ -1008,9 +1046,9 @@ afd-waf-policy-rule-match-conditions() {
         join(`=`, [`matchVariable`, matchVariable]),
         join(`=`, [
           `matchValues`,
-           to_string(length(matchValue))
+          to_string(length(matchValue))
         ]),
-       `# view matches with afd-waf-policy-rule-match-values()`
+        `# view matches with afd-waf-policy-rule-match-values()`
       ]][]' \
       --output tsv
   done
@@ -1122,3 +1160,224 @@ deployment-delete-danger() {
       --name "$deployment"
   done
 }
+
+private-dns-zones() {
+
+  # private-dns-zones - List Azure private DNS zones with details
+  #
+  # Usage: private-dns-zones
+
+  local output_format="${OUTPUT_FORMAT:-tsv}" # Define default output format or use an env variable
+
+  az network private-dns zone list \
+    --only-show-errors \
+    --query "[].[
+      name,
+      location,
+      numberOfRecordSets,
+      numberOfVirtualNetworkLinks,
+      maxNumberOfRecordSets,
+      maxNumberOfVirtualNetworkLinks,
+      provisioningState,
+      resourceGroup,
+      type
+    ]" \
+    --output "$output_format" \
+    | LC_ALL=C sort -k 1 \
+    | columnise
+}
+
+
+private-dns-zone-record-sets() {
+  local zones="$(skim-stdin "$@")"
+
+  local output_format="${OUTPUT_FORMAT:-tsv}" # Define default output format or use an env variable
+
+  if [[ -z $zones ]]; then
+    __bma_usage "<private-dns-zone> [<private-dns-zone>]"
+    return 1
+  fi
+  local zone
+  for zone in $zones; do
+    az network private-dns record-set list \
+      --zone-name "$zone" \
+      --query "[].[
+        '$zone',
+        name, 
+        type, 
+        ttl, 
+        join(',', [aRecords[].ipv4Address][]), 
+        resourceGroup,
+        fqdn
+      ]" \
+      --output "$output_format" \
+    | LC_ALL=C sort -k 1 \
+    | sed 's#Microsoft.Network/privateDnsZones/##g' \
+    | columnise
+  done
+}
+
+private-dns-zone-a-record-add(){
+    local ipv4_address="${1:?}"
+    local record_set_name="${2:?}"
+    local zone_name="${3:?}"
+    az network private-dns record-set a add-record \
+      --ipv4-address "$ipv4_address" \
+      --record-set-name "$record_set_name" \
+      --zone-name "$zone_name"
+}
+
+# Are you sure you want to perform this operation? (y/n): y
+private-dns-zone-a-record-delete() {
+    local zone_name="$1:?"
+    local name="$2:?"
+    az network private-dns record-set a delete \
+        --zone-name "$zone_name" \
+        --name "$name"
+}
+
+private-endpoints() {
+
+  # private-endpoints - List Azure private endpoints with details
+  #
+  # Usage: private-endpoints
+
+  local output_format="${OUTPUT_FORMAT:-tsv}" #  or json, table, etc
+
+    az network private-endpoint list \
+      --only-show-errors \
+      --query "[].[
+        name,
+        location,
+        privateLinkServiceConnections[0].name,
+        provisioningState,
+        resourceGroup,
+        customDnsConfigs[0].fqdn,
+        join(',' customDnsConfigs[0].ipAddresses || \`[]\`)
+      ]" \
+      --output "$output_format" \
+    | LC_ALL=C sort -k 1 \
+    | columnise
+}
+
+private-endpoint-custom-dns-configs() {
+
+  # private-endpoint-custom-dns-configs - List Azure customDnsConfigs for private endpoints
+  #
+  # Usage: private-endpointcustom-dns-configs
+
+  local private_endpoints private_endpoint 
+  private_endpoints="$(skim-stdin "$@")"
+  [[ -z $private_endpoints ]] && __bma_usage "PRIVATE_ENDPOINT [PRIVATE_ENDPOINT]" && return 1
+
+  local output_format="${OUTPUT_FORMAT:-tsv}" #  or json, table, etc
+
+  for private_endpoint in $private_endpoints; do
+    az network private-endpoint show \
+      --name "$private_endpoint" \
+      --only-show-errors \
+      --query "customDnsConfigs[].[
+        '$private_endpoint',
+        fqdn,
+        join(',' ipAddresses || \`[]\`)
+      ] || \`$private_endpoint\`" \
+      --output "$output_format" \
+    | LC_ALL=C sort -k 1 \
+    | columnise
+  done
+}
+
+vnets() {
+
+  # vnets - List Azure Virtual Networks with details
+  #
+  # Usage: list-vnets
+
+  local output_format="${OUTPUT_FORMAT:-tsv}" # or json, table, etc
+
+  az network vnet list \
+    --only-show-errors \
+    --query "[].[
+      name,
+      location,
+      addressSpace.addressPrefixes[0],
+      subnets[].name,
+      provisioningState,
+      resourceGroup,
+      type
+    ]" \
+    --output "$output_format" \
+    | LC_ALL=C sort -k 1 \
+    | columnise
+}
+      # join(',', dhcpOptions.dnsServers || [])
+
+vnet-subnets() {
+
+  # List subnets in a VNet
+  #
+  #   USAGE: vnet-subnets VNET
+  #
+  #   $ vnet-subnets my-vnet
+
+  local vnets=$(skim-stdin "$@")
+  [[ -z $vnets ]] && __bma_usage "VNET [VNET]" && return 1
+
+  local vnet
+  for vnet in $vnets; do
+    az network vnet subnet list \
+      --vnet-name "$vnet" \
+      --query "[].[
+        name,
+        addressPrefix,
+        provisioningState,
+        resourceGroup,
+        type
+      ]" \
+      --output tsv \
+    | LC_ALL=C sort -k 1 \
+    | columnise
+  done
+}
+
+
+vnet-dns-resolvers() {
+
+  # List dns resolvers in a VNet
+  #
+  #   USAGE: vnet-dns-resolvers VNET
+  #
+  #   $ vnet-dns-resolves my-vnet
+
+  local vnets=$(skim-stdin "$@")
+  [[ -z $vnets ]] && __bma_usage "VNET [VNET]" && return 1
+
+  local vnet
+  for vnet in $vnets; do
+    az network vnet show  \
+      --name "$vnet" \
+      --query "[[
+          name,
+          resourceGroup,
+          join(',', dhcpOptions.dnsServers || [])]]" \
+      --output tsv \
+    | LC_ALL=C sort -k 1 \
+    | columnise
+  done
+}
+
+# az network vnet show -n vnet-openai-prd-ae-001  --query "join(' ', dhcpOptions.dnsServers || None)" -o tsv
+
+nics() {
+    az network nic list \
+      --only-show-errors \
+      --output tsv \
+      --query "[].ipConfigurations[].[
+        name,
+        privateIPAddress,
+        join(',', privateLinkConnectionProperties.fqdns[] || \`[]\` )
+      ]" \
+    | LC_ALL=C sort -k 2 \
+    | columnise
+}
+

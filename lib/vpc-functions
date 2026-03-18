@@ -398,3 +398,99 @@ vpc-default-delete() {
     echo aws --region $REGION ec2 delete-vpc --vpc-id=$VPCID
   fi
 }
+
+
+subnet-ips() {
+  # List IP addresses for a subnet along with the resources they are allocated to
+  #
+  # USAGE: subnet-ips subnet-id [subnet-id...]
+  #
+  # EXAMPLE:
+  #     $ subnet-ips subnet-12345678
+  #     10.0.1.10  eni-1234567890abcdef  EC2 Instance  i-abcdef1234567890
+  #     10.0.1.20  eni-0987654321fedcba  RDS Instance  db-foobar
+  #     10.0.1.30  eni-1a2b3c4d5e6f7g8h  Unknown       unknown
+
+  local subnet_ids=$(skim-stdin "$@")
+  [[ -z "$subnet_ids" ]] && __bma_usage "subnet-id [subnet-id...]" && return 1
+
+  local subnet_id
+  for subnet_id in $subnet_ids; do
+    # Get all network interfaces in the subnet
+    aws ec2 describe-network-interfaces \
+      --filters "Name=subnet-id,Values=$subnet_id" \
+      --query "NetworkInterfaces[].[PrivateIpAddress,NetworkInterfaceId,Attachment.InstanceId,Description]" \
+      --output text | while read -r ip eni instance_id description; do
+        resource_type="Unknown"
+        resource_id="unknown"
+        
+        if [[ $description == *"ELB"* ]]; then
+          resource_type="Load Balancer"
+          resource_id=$(echo $description | awk '{print $2}')
+        elif [[ $description == *"RDSNetworkInterface"* ]]; then
+          resource_type="RDS Instance"
+          resource_id=$(aws rds describe-db-instances --query "DBInstances[?DBSubnetGroup.Subnets[?contains(@,'$subnet_id')]].DBInstanceIdentifier" --output text)
+        elif [[ -n $instance_id ]]; then
+          resource_type="EC2 Instance"
+          resource_id=$instance_id
+        fi
+
+        echo -e "$ip\t$eni\t$resource_type\t$resource_id"
+    done
+  done | sort -V | columnise
+}
+
+network-interfaces() {
+  # List network interfaces with key information
+  #
+  # USAGE: network-interfaces [filter]
+  #
+  # EXAMPLE:
+  #     $ network-interfaces
+  #     10.0.1.10  203.0.113.10  eni-1234567890abcdef  subnet-a1b2c3d4  vpc-11223344  in-use  default,web-tier  ELB net/my-nlb/1234567890abcdef
+
+  local filters=$(__bma_read_filters $@)
+
+  aws ec2 describe-network-interfaces \
+    --query 'NetworkInterfaces[].[
+      PrivateIpAddress,
+      Association.PublicIp || `N/A`,
+      NetworkInterfaceId,
+      VpcId,
+      SubnetId,
+      Status,
+      Description
+    ]' \
+    --output text |
+  grep -E -- "$filters" |
+  sort -V -k1,1 -k2,2 |
+  columnise
+
+  # join(`,`, Groups[].GroupName), # too noisy
+}
+
+vpc-endpoint-policy() {
+  # Show policy for VPC endpoint(s)
+  #
+  #     USAGE: vpc-endpoint-policy vpc-endpoint-id [vpc-endpoint-id]
+  #
+  #     $ vpc-endpoints | vpc-endpoint-policy
+  #     vpce-0123456789abcdef0    {
+  #                                 "Version": "2008-10-17",
+  #                                 "Statement": [...]
+  #                               }
+
+  local vpc_endpoint_ids=$(skim-stdin "$@")
+  [[ -z "$vpc_endpoint_ids" ]] && __bma_usage "vpc-endpoint-id [vpc-endpoint-id]" && return 1
+
+  local vpc_endpoint_id
+  for vpc_endpoint_id in $vpc_endpoint_ids; do
+    local policy=$(aws ec2 describe-vpc-endpoints \
+      --vpc-endpoint-ids "$vpc_endpoint_id" \
+      --query "VpcEndpoints[0].PolicyDocument" \
+      --output text)
+    
+    # Pretty print the JSON policy
+    echo "$vpc_endpoint_id    $(echo "$policy" | jq '.' | sed '2,$s/^/                               /')"
+  done
+}

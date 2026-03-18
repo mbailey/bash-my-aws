@@ -1,0 +1,56 @@
+#!/bin/bash
+
+domains() {
+  # List Route 53 domains sorted by expiry date (soonest last)
+  #
+  # USAGE: domains
+  #
+  # EXAMPLE:
+  #     $ domains
+  #     test.org     2025-11-01  false
+  #     example.com  2025-10-02  true
+
+  local filters=$(__bma_read_filters $@)
+
+  aws route53domains list-domains \
+    --region us-east-1 \
+    --output text \
+    --query 'Domains[].[DomainName,Expiry,AutoRenew]' |
+    grep -E -- "$filters" |
+    sort -k 2 -r |
+    columnise
+}
+
+domain-autorenew-disable() {
+  # Disable auto-renew for Route 53 domains
+  #
+  # USAGE: domain-autorenew-disable domain-name [domain-name]
+
+  local domain_names=$(skim-stdin "$@")
+  [[ -z "$domain_names" ]] && __bma_usage "domain-name [domain-name]" && return 1
+
+  local domain_name
+  for domain_name in $domain_names; do
+    echo "Disabling auto-renew for $domain_name"
+    aws route53domains disable-domain-auto-renew \
+      --domain-name "$domain_name" \
+      --region us-east-1
+  done
+}
+
+domain-autorenew-enable() {
+  # Enable auto-renew for Route 53 domains
+  #
+  # USAGE: domain-autorenew-enable domain-name [domain-name]
+
+  local domain_names=$(skim-stdin "$@")
+  [[ -z "$domain_names" ]] && __bma_usage "domain-name [domain-name]" && return 1
+
+  local domain_name
+  for domain_name in $domain_names; do
+    echo "Enabling auto-renew for $domain_name"
+    aws route53domains enable-domain-auto-renew \
+      --domain-name "$domain_name" \
+      --region us-east-1
+  done
+}

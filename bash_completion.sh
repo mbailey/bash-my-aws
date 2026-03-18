@@ -175,6 +175,7 @@ complete -F _bma_aws-accounts_completion aws-accounts
 complete -F _bma_buckets_completion bucket-acls
 complete -F _bma_buckets_completion bucket-remove
 complete -F _bma_buckets_completion bucket-remove-force
+complete -F _bma_buckets_completion bucket-size
 complete -F _bma_buckets_completion buckets
 complete -F _bma_certs_completion cert-chain
 complete -F _bma_certs_completion cert-delete
@@ -224,6 +225,7 @@ complete -F _bma_instances_completion instance-tag
 complete -F _bma_instances_completion instance-tag-create
 complete -F _bma_instances_completion instance-tag-delete
 complete -F _bma_instances_completion instance-tags
+complete -F _bma_instances_completion instance-tags-v2
 complete -F _bma_instances_completion instance-terminate
 complete -F _bma_instances_completion instance-termination-protection
 complete -F _bma_instances_completion instance-termination-protection-disable
@@ -242,6 +244,9 @@ complete -F _bma_stacks_completion stack-asgs
 complete -F _bma_stacks_completion stack-cancel-update
 complete -F _bma_stacks_completion stack-delete
 complete -F _bma_stacks_completion stack-diff
+complete -F _bma_stacks_completion stack-drift-detect
+complete -F _bma_stacks_completion stack-drift-resources
+complete -F _bma_stacks_completion stack-drift-status
 complete -F _bma_stacks_completion stack-elbs
 complete -F _bma_stacks_completion stack-events
 complete -F _bma_stacks_completion stack-exports
@@ -261,6 +266,7 @@ complete -F _bma_target-groups_completion target-group-targets
 complete -F _bma_target-groups_completion target-groups
 complete -F _bma_vpcs_completion vpc-az-count
 complete -F _bma_vpcs_completion vpc-azs
+complete -F _bma_vpcs_completion vpc-endpoint-policy
 complete -F _bma_vpcs_completion vpc-endpoints
 complete -F _bma_vpcs_completion vpc-igw
 complete -F _bma_vpcs_completion vpc-lambda-functions

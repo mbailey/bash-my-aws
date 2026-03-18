@@ -1,6 +1,6 @@
 #!/bin/bash
 
-hosted-zones(){
+hosted-zones() {
 
   # List Route53 Hosted Zones
   #
@@ -15,20 +15,20 @@ hosted-zones(){
   local filters=$(__bma_read_filters $@)
 
   aws route53 list-hosted-zones \
-    --output text               \
+    --output text \
     --query "
       HostedZones[${ids:+?contains(['${ids// /"','"}'], Id)}].[
         Id,
         ResourceRecordSetCount,
         (Config.PrivateZone && 'PrivateZone') || 'NotPrivateZone',
         Name
-      ]"                |
-  sort -k 4             |
-  grep -E -- "$filters" |
+      ]" |
+    sort -k 4 |
+    grep -E -- "$filters" |
     columnise
 }
 
-hosted-zone-ns-records(){
+hosted-zone-ns-records() {
 
   # Generate NS records for delegating domain to AWS
   #
@@ -47,18 +47,38 @@ hosted-zone-ns-records(){
 
   local hosted_zone_name
   hosted_zone_name=$(
-    aws route53 list-resource-record-sets            \
-      --hosted-zone-id "$hosted_zone_id"             \
+    aws route53 list-resource-record-sets \
+      --hosted-zone-id "$hosted_zone_id" \
       --query "ResourceRecordSets[?Type=='NS'].Name" \
       --output text
   )
 
-  aws route53 list-resource-record-sets                   \
-    --hosted-zone-id "$hosted_zone_id"                    \
-    --output text                                         \
+  aws route53 list-resource-record-sets \
+    --hosted-zone-id "$hosted_zone_id" \
+    --output text \
     --query "
       ResourceRecordSets[?Type=='NS'].ResourceRecords[].[
         '$hosted_zone_name 300 IN NS',
         Value
       ]"
+}
+
+hosted-zone-delete() {
+  # Delete Route53 hosted zones
+  #
+  # USAGE: hosted-zone-delete hosted-zone-id [hosted-zone-id]
+  #
+  # EXAMPLE:
+  #     $ hosted-zone-delete /hostedzone/Z1111111111111
+  #     Deleting hosted zone /hostedzone/Z1111111111111
+  #
+  local zone_ids=$(skim-stdin "$@")
+  [[ -z "$zone_ids" ]] && __bma_usage "hosted-zone-id [hosted-zone-id]" && return 1
+
+  local zone_id
+  for zone_id in $zone_ids; do
+    echo "Deleting hosted zone $zone_id"
+    aws route53 delete-hosted-zone \
+      --id "$zone_id"
+  done
 }

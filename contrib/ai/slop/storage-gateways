@@ -1,0 +1,23 @@
+storage-gateways() {
+  # List Storage Gateway instances
+  #
+  #    $ storage-gateways
+  #    gw-12345678  my-gateway  12345678-1234-1234-1234-123456789012  cached-iscsi  ACTIVATED  1.2.3.4
+
+  local filters=$(__bma_read_filters $@)
+
+  aws storagegateway list-gateways    \
+    --output text                     \
+    --query "
+      Gateways[].[
+        GatewayARN,
+        GatewayName,
+        GatewayId,
+        GatewayType,
+        GatewayOperationalState,
+        GatewayNetworkInterfaces[0].IpAddress
+      ]"                             |
+  grep -E -- "$filters"             |
+  columnise
+}
+

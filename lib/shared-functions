@@ -31,6 +31,14 @@ skim-stdin() {
 
 }
 
+columnise() {
+  if [[ $BMA_COLUMNISE_ONLY_WHEN_TERMINAL_PRESENT == 'true' ]] && ! [[ -t 1 ]]; then
+    cat
+  else
+    column -t -s $'\t'
+  fi
+}
+
 __bma-using-aws-cli-v1() {
   aws --version | grep 'aws-cli/1' &>/dev/null
 }
