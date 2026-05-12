@@ -63,6 +63,13 @@ aws-account-cost-recommendations
 aws-account-each
 aws-account-id
 aws-accounts
+aws-config-aggregators
+aws-config-conformance-packs
+aws-config-delivery-channels
+aws-config-recorder-status
+aws-config-recorders
+aws-config-rule-compliance
+aws-config-rules
 aws-panopticon
 az-account
 az-cache-item
