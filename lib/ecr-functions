@@ -9,8 +9,8 @@ ecr-repositories() {
   local aws_account_id=$(skim-stdin)
   local filters=$(__bma_read_filters $@)
 
-  aws ecr describe-repositories          \
-    ${aws_account_id/#/'--registry-id '} \
+  aws ecr describe-repositories                      \
+    ${aws_account_id:+--registry-id $aws_account_id} \
     --query "
       repositories[].[
         repositoryName,
