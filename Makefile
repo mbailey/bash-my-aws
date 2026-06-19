@@ -19,6 +19,7 @@ test: run_tests
 run_tests:
 	'./test/shared-spec.sh'
 	'./test/stack-spec.sh'
+	'./test/ssm-spec.sh'
 
 check:
 	@echo "Checking if generated files are up to date..."

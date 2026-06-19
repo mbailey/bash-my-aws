@@ -14,6 +14,7 @@ alias _bma_derive_stack_from_params='${BMA_HOME:-$HOME/.bash-my-aws}/bin/bma _bm
 alias _bma_derive_stack_from_template='${BMA_HOME:-$HOME/.bash-my-aws}/bin/bma _bma_derive_stack_from_template'
 alias _bma_derive_template_from_params='${BMA_HOME:-$HOME/.bash-my-aws}/bin/bma _bma_derive_template_from_params'
 alias _bma_derive_template_from_stack='${BMA_HOME:-$HOME/.bash-my-aws}/bin/bma _bma_derive_template_from_stack'
+alias _bma_ssm_encode_command='${BMA_HOME:-$HOME/.bash-my-aws}/bin/bma _bma_ssm_encode_command'
 alias _bma_stack_args='${BMA_HOME:-$HOME/.bash-my-aws}/bin/bma _bma_stack_args'
 alias _bma_stack_capabilities='${BMA_HOME:-$HOME/.bash-my-aws}/bin/bma _bma_stack_capabilities'
 alias _bma_stack_diff_params='${BMA_HOME:-$HOME/.bash-my-aws}/bin/bma _bma_stack_diff_params'

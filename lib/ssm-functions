@@ -44,6 +44,18 @@ ssm-instances() {
     columnise
 }
 
+_bma_ssm_encode_command() {
+
+  # Base64-encode a command to a single line with no embedded whitespace.
+  #
+  # BSD/macOS `base64` wraps its output at 76 columns and has no GNU `-w0`,
+  # so we strip the newlines portably with `tr -d '\n'` (works on BSD + GNU).
+  # Without this, the wrapped blob's newlines later collapse to spaces and the
+  # remote `base64 --decode` rejects the payload with "base64: invalid input".
+
+  echo "$1" | base64 | tr -d '\n'
+}
+
 ssm-send-command() {
 
   # Run a command locally on EC2 instance(s) running Linux
@@ -97,8 +109,7 @@ ssm-send-command() {
 
     # Base64 encode the command if it's a script
     if [[ $command == *$'\n'* ]]; then
-      command=$(echo "$command" | base64)
-      command="echo $command | base64 --decode | bash"
+      command="echo $(_bma_ssm_encode_command "$command") | base64 --decode | bash"
     fi
   fi
 

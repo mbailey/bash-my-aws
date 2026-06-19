@@ -2160,6 +2160,12 @@ List Instances known to SSM
    $ ssm-instances Windows
    i-00a123b456d789012 Online  Microsoft Windows Server 2019 Datacenter  68.0.11111  192.168.1.10    server001.example.com
    i-01b234c567e890123 Online  Microsoft Windows Server 2022 Datacenter  68.0.11112  192.168.1.20    winserver002.example.com
+Base64-encode a command to a single line with no embedded whitespace.
+
+BSD/macOS `base64` wraps its output at 76 columns and has no GNU `-w0`,
+so we strip the newlines portably with `tr -d '\n'` (works on BSD + GNU).
+Without this, the wrapped blob's newlines later collapse to spaces and the
+remote `base64 --decode` rejects the payload with "base64: invalid input".
 
 
 ### ssm-send-command
