@@ -14,6 +14,7 @@ _bma_derive_stack_from_params
 _bma_derive_stack_from_template
 _bma_derive_template_from_params
 _bma_derive_template_from_stack
+_bma_ssm_encode_command
 _bma_stack_args
 _bma_stack_capabilities
 _bma_stack_diff_params
