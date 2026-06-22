@@ -1989,6 +1989,21 @@ List CloudWatch Log Groups
     /aws/lambda/walk    1576567300172  0   11794
 
 
+### log-group-delete
+
+Delete CloudWatch Log Group
+
+    $ log-group-delete /aws/lambda/stars
+    You are about to delete the following log groups?
+    /aws/lambda/stars
+    Are you sure? [y/N] y
+    Deleting: /aws/lambda/stars
+    Deleted: /aws/lambda/stars
+    
+    You can also pipe the log group names to this command
+    $ log-groups | log-group-delete
+
+
 ## rds-commands
 
 

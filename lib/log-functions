@@ -37,3 +37,34 @@ log-groups() {
   $column_command
 }
 
+log-group-delete() {
+
+  # Delete CloudWatch Log Group
+  #
+  #     $ log-group-delete /aws/lambda/stars
+  #     You are about to delete the following log groups?
+  #     /aws/lambda/stars
+  #     Are you sure? [y/N] y
+  #     Deleting: /aws/lambda/stars
+  #     Deleted: /aws/lambda/stars
+  #     
+  #     You can also pipe the log group names to this command
+  #     $ log-groups | log-group-delete
+
+  local log_groups=$(skim-stdin "$@")
+  local log_group_name
+
+  [[ -z $log_groups ]] && return 1
+  [ -t 0 ] || exec 0< /dev/tty
+  local regex_yes='^[yY]$'
+  echo "You are about to delete the following log groups?"
+  echo "$log_groups" | tr ' ' '\n' 
+  read -p "Are you sure? [y/N] " -n 1 -r
+  [[ $REPLY =~ $regex_yes ]] || return 0
+
+  for log_group_name in $log_groups; do
+    echo "Deleting: $log_group_name"
+    aws logs delete-log-group --log-group-name "$log_group_name"
+    echo "Deleted: $log_group_name"
+  done
+}
