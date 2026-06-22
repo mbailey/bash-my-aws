@@ -976,6 +976,9 @@ List CloudFormation stack for asg(s)
 List scaling activities for Autoscaling Group(s)
 
 
+azure.azcli
+
+
 ## azure-commands
 
 
@@ -1373,9 +1376,6 @@ List dns resolvers in a VNet
 
 ### nics
 
-
-
-azure.azcli
 
 
 ## backup-commands
@@ -2042,6 +2042,58 @@ EXAMPLE:
     $ hosted-zone-delete /hostedzone/Z1111111111111
     Deleting hosted zone /hostedzone/Z1111111111111
 
+
+
+### r53-zones
+
+List Route53 Hosted Zones
+
+    $ r53-zones
+    /hostedzone/Z3333333333333  5   NotPrivateZone  bash-my-aws.org.
+    /hostedzone/Z5555555555555  2   NotPrivateZone  bash-my-universe.com.
+    /hostedzone/Z4444444444444  3   NotPrivateZone  bashmyaws.org.
+    /hostedzone/Z1111111111111  3   NotPrivateZone  bash-my-aws.com.
+    /hostedzone/Z2222222222222  3   NotPrivateZone  bashmyaws.com.
+SUPPORTED OPTION FLAGS:
+    '-P|--private'
+    '-p|--public'
+
+    RATIONALE:
+    Sometimes you can find the undesirable situation of the same domain name
+    being used for both public and private zones.  This enables differentiation
+
+    '-x|--exact'
+
+    RATIONALE
+    The default behaviour matches a given domain and its subdomains e.g:
+      'r53-zones contoso.com' would match contoso.com, prod.contoso.com, internal.contoso.com etc
+      'r53-zones --exact contoso.com' matches only contoso.com
+
+
+### r53-zone-records
+
+List Records in a Route53 Hosted Zone
+NOTE: AWS alias records are shown with a fake TTL of 86400.
+
+    $ r53-zones bash-my-aws.org
+    /hostedzone/ZJ6ZCG2UD6OKX  5  NotPrivateZone  bash-my-aws.org.
+
+    $ r53-zones bash-my-aws.org | r53-zone-records
+    bash-my-aws.org.  900 SOA ns-1549.awsdns-01.co.uk. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400
+    bash-my-aws.org.  300 NS  ns-1464.awsdns-55.org.
+    bash-my-aws.org.  300 A 185.199.108.153
+    bash-my-aws.org.  300 A 185.199.109.153
+    bash-my-aws.org.  300 TXT "google-site-verification=RbKejqu95y4Q78BkWnjaiM0rl6SYugtTdVLexK35b2k"
+    lb.bash-my-aws.org. 86400 ALIAS dualstack.lb-bmaorg-12345.us-east-1.elb.amazonaws.com
+SUPPORTED OPTIONS:
+--type [Required: type]
+    RATIONALE:
+    This allows robust filtering by record type
+
+    EXAMPLE:
+    $ r53-zones bash-my-aws.org | r53-zone-records --type A
+    bash-my-aws.org.  300 A 185.199.108.153
+    bash-my-aws.org.  300 A 185.199.109.153
 
 
 ## s3-commands

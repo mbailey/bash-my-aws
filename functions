@@ -199,6 +199,8 @@ private-dns-zone-record-sets
 private-dns-zones
 private-endpoint-custom-dns-configs
 private-endpoints
+r53-zone-records
+r53-zones
 rds-db-clusters
 rds-db-instances
 region
