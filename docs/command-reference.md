@@ -976,6 +976,70 @@ List CloudFormation stack for asg(s)
 List scaling activities for Autoscaling Group(s)
 
 
+## aws-config-commands
+
+
+### aws-config-recorders
+
+List AWS Config configuration recorders
+
+    $ aws-config-recorders
+    default  arn:aws:iam::012345678901:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig  allSupported=true  includeGlobalResourceTypes=true
+
+
+### aws-config-recorder-status
+
+List recording status of AWS Config configuration recorders
+
+    USAGE: aws-config-recorder-status [recorder] [recorder]
+
+    $ aws-config-recorders | aws-config-recorder-status
+    default  recording=true  lastStatus=SUCCESS  2024-06-12T03:21:09.123000+00:00
+
+
+### aws-config-rules
+
+List AWS Config rules
+
+    $ aws-config-rules
+    required-tags  ACTIVE  AWS  REQUIRED_TAGS  arn:aws:config:ap-southeast-2:012345678901:config-rule/config-rule-abc123
+
+
+### aws-config-rule-compliance
+
+Show compliance status for given AWS Config rule(s)
+
+    USAGE: aws-config-rule-compliance rule-name [rule-name]
+
+    $ aws-config-rules | aws-config-rule-compliance
+    required-tags         NON_COMPLIANT  ComplianceContributorCount=12
+    s3-bucket-versioning  COMPLIANT      ComplianceContributorCount=0
+
+
+### aws-config-delivery-channels
+
+List AWS Config delivery channels
+
+    $ aws-config-delivery-channels
+    default  my-config-bucket  AWSLogs  arn:aws:sns:ap-southeast-2:012345678901:config-topic  TwentyFour_Hours
+
+
+### aws-config-aggregators
+
+List AWS Config configuration aggregators
+
+    $ aws-config-aggregators
+    org-aggregator  arn:aws:config:ap-southeast-2:012345678901:config-aggregator/config-aggregator-xyz  ORGANIZATION  2024-01-15T03:21:09.123000+00:00
+
+
+### aws-config-conformance-packs
+
+List AWS Config conformance packs
+
+    $ aws-config-conformance-packs
+    OperationalBestPractices  conformance-pack-abc123  my-conformance-bucket  CONFORMANCE_PACK  2024-01-15T03:21:09.123000+00:00
+
+
 ## azure-commands
 
 

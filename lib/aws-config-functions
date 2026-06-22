@@ -1,0 +1,181 @@
+#!/bin/bash
+#
+# aws-config-functions
+#
+# These functions target AWS Config (the configuration recording and rules
+# service, accessed via `aws configservice` on the AWS CLI).
+
+aws-config-recorders() {
+
+  # List AWS Config configuration recorders
+  #
+  #     $ aws-config-recorders
+  #     default  arn:aws:iam::012345678901:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig  allSupported=true  includeGlobalResourceTypes=true
+
+  local recorder_names=$(skim-stdin)
+  local filters=$(__bma_read_filters "$@")
+
+  aws configservice describe-configuration-recorders          \
+    ${recorder_names/#/'--configuration-recorder-names '}     \
+    --output text                                             \
+    --query "
+      ConfigurationRecorders[].[
+        name,
+        roleARN,
+        join('=', ['allSupported', to_string(recordingGroup.allSupported)]),
+        join('=', ['includeGlobalResourceTypes', to_string(recordingGroup.includeGlobalResourceTypes)])
+      ]"                  |
+  grep -E -- "$filters"   |
+    columnise
+}
+
+aws-config-recorder-status() {
+
+  # List recording status of AWS Config configuration recorders
+  #
+  #     USAGE: aws-config-recorder-status [recorder] [recorder]
+  #
+  #     $ aws-config-recorders | aws-config-recorder-status
+  #     default  recording=true  lastStatus=SUCCESS  2024-06-12T03:21:09.123000+00:00
+
+  local recorder_names=$(skim-stdin "$@")
+
+  aws configservice describe-configuration-recorder-status      \
+    ${recorder_names/#/'--configuration-recorder-names '}       \
+    --output text                                               \
+    --query "
+      ConfigurationRecordersStatus[].[
+        name,
+        join('=', ['recording', to_string(recording)]),
+        join('=', ['lastStatus', to_string(lastStatus)]),
+        to_string(lastStatusChangeTime)
+      ]"                |
+    columnise
+}
+
+aws-config-rules() {
+
+  # List AWS Config rules
+  #
+  #     $ aws-config-rules
+  #     required-tags  ACTIVE  AWS  REQUIRED_TAGS  arn:aws:config:ap-southeast-2:012345678901:config-rule/config-rule-abc123
+
+  local rule_names=$(skim-stdin)
+  local filters=$(__bma_read_filters "$@")
+
+  aws configservice describe-config-rules         \
+    ${rule_names/#/'--config-rule-names '}        \
+    --output text                                 \
+    --query "
+      ConfigRules[].[
+        ConfigRuleName,
+        ConfigRuleState,
+        Source.Owner,
+        Source.SourceIdentifier || 'CUSTOM',
+        ConfigRuleArn
+      ]"                  |
+  grep -E -- "$filters"   |
+    columnise
+}
+
+aws-config-rule-compliance() {
+
+  # Show compliance status for given AWS Config rule(s)
+  #
+  #     USAGE: aws-config-rule-compliance rule-name [rule-name]
+  #
+  #     $ aws-config-rules | aws-config-rule-compliance
+  #     required-tags         NON_COMPLIANT  ComplianceContributorCount=12
+  #     s3-bucket-versioning  COMPLIANT      ComplianceContributorCount=0
+
+  local rule_names=$(skim-stdin "$@")
+  [[ -z "$rule_names" ]] && __bma_usage "rule-name [rule-name]" && return 1
+
+  aws configservice describe-compliance-by-config-rule  \
+    --config-rule-names $rule_names                     \
+    --output text                                       \
+    --query "
+      ComplianceByConfigRules[].[
+        ConfigRuleName,
+        Compliance.ComplianceType,
+        join('=', [
+          'ComplianceContributorCount',
+          to_string(Compliance.ComplianceContributorCount.CappedCount || \`0\`)
+        ])
+      ]"                |
+    columnise
+}
+
+aws-config-delivery-channels() {
+
+  # List AWS Config delivery channels
+  #
+  #     $ aws-config-delivery-channels
+  #     default  my-config-bucket  AWSLogs  arn:aws:sns:ap-southeast-2:012345678901:config-topic  TwentyFour_Hours
+
+  local channel_names=$(skim-stdin)
+  local filters=$(__bma_read_filters "$@")
+
+  aws configservice describe-delivery-channels        \
+    ${channel_names/#/'--delivery-channel-names '}    \
+    --output text                                     \
+    --query "
+      DeliveryChannels[].[
+        name,
+        s3BucketName,
+        s3KeyPrefix || 'NO_PREFIX',
+        snsTopicARN || 'NO_SNS_TOPIC',
+        configSnapshotDeliveryProperties.deliveryFrequency || 'NO_FREQUENCY'
+      ]"                  |
+  grep -E -- "$filters"   |
+    columnise
+}
+
+aws-config-aggregators() {
+
+  # List AWS Config configuration aggregators
+  #
+  #     $ aws-config-aggregators
+  #     org-aggregator  arn:aws:config:ap-southeast-2:012345678901:config-aggregator/config-aggregator-xyz  ORGANIZATION  2024-01-15T03:21:09.123000+00:00
+
+  local aggregator_names=$(skim-stdin)
+  local filters=$(__bma_read_filters "$@")
+
+  aws configservice describe-configuration-aggregators           \
+    ${aggregator_names/#/'--configuration-aggregator-names '}    \
+    --output text                                                \
+    --query "
+      ConfigurationAggregators[].[
+        ConfigurationAggregatorName,
+        ConfigurationAggregatorArn,
+        (OrganizationAggregationSource && 'ORGANIZATION') || 'ACCOUNTS',
+        to_string(CreationTime)
+      ]"                  |
+  grep -E -- "$filters"   |
+    columnise
+}
+
+aws-config-conformance-packs() {
+
+  # List AWS Config conformance packs
+  #
+  #     $ aws-config-conformance-packs
+  #     OperationalBestPractices  conformance-pack-abc123  my-conformance-bucket  CONFORMANCE_PACK  2024-01-15T03:21:09.123000+00:00
+
+  local pack_names=$(skim-stdin)
+  local filters=$(__bma_read_filters "$@")
+
+  aws configservice describe-conformance-packs            \
+    ${pack_names/#/'--conformance-pack-names '}           \
+    --output text                                         \
+    --query "
+      ConformancePackDetails[].[
+        ConformancePackName,
+        ConformancePackId,
+        DeliveryS3Bucket || 'NO_BUCKET',
+        CreatedBy || 'SELF',
+        to_string(LastUpdateRequestedTime)
+      ]"                  |
+  grep -E -- "$filters"   |
+    columnise
+}
